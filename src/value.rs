@@ -1,6 +1,11 @@
+extern crate ordered_float;
+
 use std::cmp::Ordering;
-// use std::collections::HashMap;
-use std::collections::BTreeMap;
+use std::collections::HashMap;
+use std::hash::{Hash, Hasher};
+use ordered_float::OrderedFloat;
+//use std::collections::BTreeMap;
+
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -12,9 +17,10 @@ pub enum Value {
     Double(f64),
     Bytes(Vec<u8>),
     String(String),
+    // TODO: Ref type shouldn't be i32, Change it to arc
     Ref(i32),
     List(Vec<Value>),
-    Map(BTreeMap<Value, Value>),
+    Map(HashMap<Value, Value>),
 }
 
 impl PartialOrd for Value {
@@ -22,6 +28,30 @@ impl PartialOrd for Value {
         Some(self.cmp(&other))
     }
 }
+
+impl Eq for Value {}
+
+// Although we impl Hash for Map and List, we shouldn't use container type as key
+impl Hash for Value {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        use self::Value::*;
+
+        match *self {
+            Null => ().hash(state),
+            Bool(b) => b.hash(state),
+            Int(i) => i.hash(state),
+            Long(l)=>l.hash(state),
+            Double(d) => OrderedFloat(d).hash(state),
+            Bytes(ref bytes) => bytes.hash(state),
+            String(ref s) => s.hash(state),
+            Ref(i) => i.hash(state),
+            List(ref l) => l.hash(state),
+            // Hash each key-value is too expensive.
+            Map(ref m) => m.len().hash(state),
+        }
+    }
+}
+
 
 impl Ord for Value {
     fn cmp(&self, other: &Value) -> Ordering {
@@ -78,22 +108,67 @@ impl Ord for Value {
                 Ref(i2) => i.cmp(&i2),
                 _ => Ordering::Greater,
             },
-            List(l) => match *other {
+            List(ref l) => match other {
                 Map(_) => Ordering::Less,
-                List(l2) => l.len().cmp(&l2.len()),
+                List(l2) => l.cmp(l2),
                 _ => Ordering::Greater,
             },
-            Map(m) => match *other {
-                Map(m2) => m.len().cmp(&m2.len()),
+            Map(ref m) => match other {
+                Map(m2) => {
+                    let v1: Vec<_> = m.iter().collect();
+                    let v2: Vec<_> = m2.iter().collect();
+                    v1.cmp(&v2)
+                }
                 _ => Ordering::Greater,
             },
         }
     }
 }
 
+
 fn float_ord(f: f64, g: f64) -> Ordering {
     match f.partial_cmp(&g) {
         Some(o) => o,
         None => Ordering::Less,
+    }
+}
+
+pub trait ToHessian {
+    fn to_hessian(self) -> Value;
+}
+
+
+macro_rules! to_hessian (
+    ($t:ty, $v:expr) => (
+        impl ToHessian for $t {
+        fn to_hessian(self) -> Value {
+            $v(self)
+        }
+    }
+    );
+);
+
+to_hessian!(bool, Value::Bool);
+to_hessian!(i32, Value::Int);
+to_hessian!(i64, Value::Long);
+to_hessian!(f64, Value::Double);
+to_hessian!(String, Value::String);
+to_hessian!(Vec<u8>, Value::Bytes);
+
+impl ToHessian for () {
+    fn to_hessian(self) -> Value {
+        Value::Null
+    }
+}
+
+impl<'a> ToHessian for &'a str {
+    fn to_hessian(self) -> Value {
+        Value::String(self.to_owned())
+    }
+}
+
+impl<'a> ToHessian for &'a [u8] {
+    fn to_hessian(self) -> Value {
+        Value::Bytes(self.to_owned())
     }
 }
