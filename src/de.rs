@@ -3,14 +3,13 @@ use std::io::{Read, BufReader};
 use std::collections::BTreeMap;
 
 use super::value::Value;
-use super::error::ErrorCode;
-use std::fmt::Error;
 use std::result;
 use crate::constant::ByteCodecType;
+use crate::error::{Result, Error, ErrorCode};
+use crate::error::Error::{SyntaxError, IoError};
 
 type MemoId = u32;
 
-pub type Result<T> = result::Result<T, ErrorCode>;
 
 pub struct Deserializer<R: Read> {
     buffer: BufReader<R>,
@@ -27,6 +26,10 @@ impl<R: Read> Deserializer<R> {
         }
     }
 
+    fn error<T>(&self, err: ErrorCode)-> Result<T>{
+        Err(SyntaxError(err))
+    }
+
 
     #[inline]
     fn read_byte(&mut self) -> Result<u8> {
@@ -36,8 +39,8 @@ impl<R: Read> Deserializer<R> {
                 self.pos += 1;
                 Ok(b[0])
             },
-            Ok(_) => Err(ErrorCode::EofWhileParsing),
-            Err(e) => Err(ErrorCode::IoError),
+            Ok(_) => self.error(ErrorCode::EofWhileParsing),
+            Err(e) => Err(IoError(e))
         }
     }
 
@@ -46,8 +49,8 @@ impl<R: Read> Deserializer<R> {
         let mut buf = Vec::new();
         match self.buffer.by_ref().take(n as u64).read_to_end(&mut buf){
             Ok(m) if m == n => { self.pos += n; Ok(buf)}
-            Ok(_) => Err(ErrorCode::EofWhileParsing),
-            Err(e) => Err(ErrorCode::IoError),
+            Ok(_) => self.error(ErrorCode::EofWhileParsing),
+            Err(e) => Err(Error::IoError(e)),
         }
     }
 
@@ -58,7 +61,7 @@ impl<R: Read> Deserializer<R> {
                 let b = self.read_bytes(size)?;
                 Ok(Value::Bytes(b))
             }
-            _ => Err(ErrorCode::UnknownType),
+            _ => self.error(ErrorCode::UnknownType),
         }
     }
 }
