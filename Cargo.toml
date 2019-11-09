@@ -1,8 +1,12 @@
 [package]
 name = "hessian_rs"
-version = "0.1.0"
+version = "0.0.1"
 authors = ["lynskylate <lynskylate@gmail.com>"]
 edition = "2018"
+keywords = ["serialization", "hessian2", "serde"]
+categories = ["encoding"]
+description = "hessian2 codec implemention"
+license = "GPL-3.0-or-later"
 
 [dependencies]
 ordered-float = "1.0"
