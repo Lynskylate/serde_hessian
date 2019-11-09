@@ -17,8 +17,7 @@ pub enum Value {
     Double(f64),
     Bytes(Vec<u8>),
     String(String),
-    // TODO: Ref type shouldn't be i32, Change it to arc
-    Ref(i32),
+    Ref(u32),
     List(Vec<Value>),
     Map(HashMap<Value, Value>),
 }
@@ -47,7 +46,7 @@ impl Hash for Value {
             Ref(i) => i.hash(state),
             List(ref l) => l.hash(state),
             // Hash each key-value is too expensive.
-            Map(ref m) => m.len().hash(state),
+            Map(ref m) => std::ptr::hash(m, state),
         }
     }
 }

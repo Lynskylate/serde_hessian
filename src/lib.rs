@@ -1,5 +1,8 @@
 pub mod value;
 pub mod de;
+pub mod ser;
+pub mod error;
+pub mod constant;
 
 #[cfg(test)]
 mod tests {
