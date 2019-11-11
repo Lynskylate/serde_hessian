@@ -1,21 +1,20 @@
+use crate::error::Error::IoError;
 use std::io;
 use std::result;
-use crate::error::Error::IoError;
-
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum ErrorCode{
+pub enum ErrorCode {
     EofWhileParsing,
     UnknownType,
 }
 
-pub enum Error{
+pub enum Error {
     SyntaxError(ErrorCode),
     IoError(io::Error),
 }
 
-impl From<io::Error> for Error{
-    fn from(error: io::Error) -> Error{
+impl From<io::Error> for Error {
+    fn from(error: io::Error) -> Error {
         IoError(error)
     }
 }

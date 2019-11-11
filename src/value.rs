@@ -1,11 +1,10 @@
 extern crate ordered_float;
 
+use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::hash::{Hash, Hasher};
-use ordered_float::OrderedFloat;
 //use std::collections::BTreeMap;
-
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -39,7 +38,7 @@ impl Hash for Value {
             Null => ().hash(state),
             Bool(b) => b.hash(state),
             Int(i) => i.hash(state),
-            Long(l)=>l.hash(state),
+            Long(l) => l.hash(state),
             Double(d) => OrderedFloat(d).hash(state),
             Bytes(ref bytes) => bytes.hash(state),
             String(ref s) => s.hash(state),
@@ -50,7 +49,6 @@ impl Hash for Value {
         }
     }
 }
-
 
 impl Ord for Value {
     fn cmp(&self, other: &Value) -> Ordering {
@@ -124,7 +122,6 @@ impl Ord for Value {
     }
 }
 
-
 fn float_ord(f: f64, g: f64) -> Ordering {
     match f.partial_cmp(&g) {
         Some(o) => o,
@@ -135,7 +132,6 @@ fn float_ord(f: f64, g: f64) -> Ordering {
 pub trait ToHessian {
     fn to_hessian(self) -> Value;
 }
-
 
 macro_rules! to_hessian (
     ($t:ty, $v:expr) => (

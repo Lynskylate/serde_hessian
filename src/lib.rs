@@ -1,8 +1,8 @@
-pub mod value;
-pub mod de;
-pub mod ser;
-pub mod error;
 pub mod constant;
+pub mod de;
+pub mod error;
+pub mod ser;
+pub mod value;
 
 #[cfg(test)]
 mod tests {
