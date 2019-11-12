@@ -66,6 +66,7 @@ impl<W: io::Write> Serializer<W> {
         match *value {
             Value::Int(i) => self.serialize_int(i),
             Value::Bytes(ref b) => self.serialize_binary(b),
+            Value::String(ref s) => self.serialize_string(s.as_str()),
             _ => Err(Error::SyntaxError(ErrorCode::UnknownType)),
         }
     }
@@ -113,6 +114,45 @@ impl<W: io::Write> Serializer<W> {
         }
         Ok(())
     }
+
+    // Serialize String to bytes, format as
+    //    string ::= x52 b1 b0 <utf8-data> string
+    //    ::= S b1 b0 <utf8-data>
+    //    ::= [x00-x1f] <utf8-data>
+    //    ::= [x30-x33] b0 <utf8-data>
+    fn serialize_string(&mut self, v: &str) -> Result<()> {
+        let will_write_bytes = v.as_bytes();
+        let will_write_bytes_len = will_write_bytes.len();
+        if will_write_bytes_len <= 0x1f {
+            self.writer
+                .write_all(&[will_write_bytes_len as u8])
+                .and_then(|_| self.writer.write_all(will_write_bytes))
+                .map_err(From::from)
+        } else if will_write_bytes_len < 1024 {
+            self.writer
+                .write_all(&[
+                    (0x30 + ((will_write_bytes_len >> 8) & 0xff)) as u8,
+                    (will_write_bytes_len & 0xff) as u8,
+                ])
+                .and_then(|_| self.writer.write_all(will_write_bytes))
+                .map_err(From::from)
+        } else {
+            // Split long string to many chunks
+            for (last, chunk) in will_write_bytes.chunks(0xffff).identify_last() {
+                let flag = if last { 'S' as u8 } else { 0x52 };
+                let len_bytes = (v.len() as u16).to_be_bytes();
+                let res = self.writer.write_all(&[flag]).and_then(|_| {
+                    self.writer
+                        .write_all(&len_bytes)
+                        .and_then(|_| self.writer.write_all(chunk))
+                });
+                if let Err(e) = res {
+                    return Err(Error::IoError(e));
+                }
+            }
+            Ok(())
+        }
+    }
 }
 
 #[cfg(test)]
@@ -120,6 +160,7 @@ mod tests {
     use super::Serializer;
     use crate::value::Value;
     use crate::value::Value::Int;
+    use std::ops::Deref;
 
     fn test_encode_ok(value: Value, target: &[u8]) {
         let mut ser = Serializer::new(Vec::new());
@@ -142,5 +183,15 @@ mod tests {
         test_encode_ok(Int(262143), &[0xd7, 0xff, 0xff]);
 
         test_encode_ok(Int(262144), &['I' as u8, 0x00, 0x04, 0x00, 0x00])
+    }
+
+    #[test]
+    fn test_encde_string() {
+        // TODO(lynskylate): Add more test for encode string
+        test_encode_ok(Value::String(String::new()), &[0x00]);
+        test_encode_ok(
+            Value::String(vec!['a'; 0x1f].into_iter().collect()),
+            &[&[0x1f as u8], vec!['a' as u8; 0x1f].as_slice()].concat(),
+        );
     }
 }

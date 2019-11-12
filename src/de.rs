@@ -1,10 +1,10 @@
 use std::collections::BTreeMap;
 use std::io::{BufReader, Read};
 
-use super::value::Value;
 use super::constant::ByteCodecType;
 use super::error::Error::{IoError, SyntaxError};
 use super::error::{Error, ErrorCode, Result};
+use super::value::Value;
 
 type MemoId = u32;
 
