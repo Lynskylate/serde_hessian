@@ -1,6 +1,5 @@
 use std::borrow::BorrowMut;
 use std::io;
-use std::slice::Chunks;
 
 use super::error::{Error, ErrorCode, Result};
 use super::value::Value;
