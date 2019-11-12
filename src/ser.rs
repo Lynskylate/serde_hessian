@@ -72,7 +72,6 @@ impl<W: io::Write> Serializer<W> {
     }
 
     fn serialize_int(&mut self, v: i32) -> Result<()> {
-        println!("{}", v);
         let bytes = match v {
             -16..=47 => vec![(0x90 + v) as u8],
             -2048..=2047 => vec![(((v >> 8) & 0xff) + 0xc8) as u8, (v & 0xff) as u8],
@@ -142,5 +141,7 @@ mod tests {
 
         test_encode_ok(Int(-262144), &[0xd0, 0x00, 0x00]);
         test_encode_ok(Int(262143), &[0xd7, 0xff, 0xff]);
+
+        test_encode_ok(Int(262144), &['I' as u8, 0x00, 0x04, 0x00, 0x00])
     }
 }
