@@ -3,6 +3,8 @@ use std::io;
 
 use super::error::{Error, ErrorCode, Result};
 use super::value::Value;
+use core::fmt::Write;
+use std::hash::Hasher;
 
 pub struct Serializer<W> {
     writer: W,
@@ -67,8 +69,19 @@ impl<W: io::Write> Serializer<W> {
             Value::Int(i) => self.serialize_int(i),
             Value::Bytes(ref b) => self.serialize_binary(b),
             Value::String(ref s) => self.serialize_string(s.as_str()),
+            Value::Bool(b) => self.serialize_bool(b),
+            Value::Null => self.serialize_null(),
             _ => Err(Error::SyntaxError(ErrorCode::UnknownType)),
         }
+    }
+
+    fn serialize_null(&mut self) -> Result<()> {
+        self.writer.write_all(&[b'N']).map_err(From::from)
+    }
+
+    fn serialize_bool(&mut self, value: bool) -> Result<()> {
+        let f = if value { b'T' } else { b'F' };
+        self.writer.write_all(&[f]).map_err(From::from)
     }
 
     fn serialize_int(&mut self, v: i32) -> Result<()> {
@@ -81,7 +94,7 @@ impl<W: io::Write> Serializer<W> {
                 (v & 0xff) as u8,
             ],
             _ => vec![
-                'I' as u8,
+                b'I',
                 (v >> 24 & 0xff) as u8,
                 (v >> 16 & 0xff) as u8,
                 (v >> 8 & 0xff) as u8,
@@ -101,7 +114,7 @@ impl<W: io::Write> Serializer<W> {
                 .map_err(From::from);
         }
         for (last, chunk) in v.chunks(0xffff).identify_last() {
-            let flag = if last { 'B' as u8 } else { 'b' as u8 };
+            let flag = if last { b'B' } else { b'b' };
             let len_bytes = (v.len() as u16).to_be_bytes();
             let res = self.writer.write_all(&[flag]).and_then(|_| {
                 self.writer
@@ -182,7 +195,7 @@ mod tests {
         test_encode_ok(Int(-262144), &[0xd0, 0x00, 0x00]);
         test_encode_ok(Int(262143), &[0xd7, 0xff, 0xff]);
 
-        test_encode_ok(Int(262144), &['I' as u8, 0x00, 0x04, 0x00, 0x00])
+        test_encode_ok(Int(262144), &[b'I', 0x00, 0x04, 0x00, 0x00])
     }
 
     #[test]
@@ -193,5 +206,16 @@ mod tests {
             Value::String(vec!['a'; 0x1f].into_iter().collect()),
             &[&[0x1f as u8], vec!['a' as u8; 0x1f].as_slice()].concat(),
         );
+    }
+
+    #[test]
+    fn test_encode_bool() {
+        test_encode_ok(Value::Bool(true), &[b'T']);
+        test_encode_ok(Value::Bool(false), &[b'F']);
+    }
+
+    #[test]
+    fn test_encode_null() {
+        test_encode_ok(Value::Null, &[b'N']);
     }
 }
