@@ -71,6 +71,7 @@ impl<W: io::Write> Serializer<W> {
             Value::String(ref s) => self.serialize_string(s.as_str()),
             Value::Bool(b) => self.serialize_bool(b),
             Value::Null => self.serialize_null(),
+            Value::Long(l) => self.serialize_long(l),
             _ => Err(Error::SyntaxError(ErrorCode::UnknownType)),
         }
     }
@@ -84,11 +85,32 @@ impl<W: io::Write> Serializer<W> {
         self.writer.write_all(&[f]).map_err(From::from)
     }
 
+    fn serialize_long(&mut self, v: i64) -> Result<()> {
+        let bytes = match v {
+            -8..=15 => vec![(0xd8 + v) as u8],
+            -2048..=2047 => vec![(((v >> 8) + 0xf0) & 0xff) as u8, (v & 0xff) as u8],
+            -262_144..=262_133 => vec![
+                ((v >> 16) + 0x3c) as u8,
+                ((v >> 8) & 0xff) as u8,
+                (v & 0xff) as u8,
+            ],
+            _ if v >= i32::min_value() as i64 && v <= i32::max_value() as i64 => vec![
+                0x59 as u8,
+                (v >> 24 & 0xff) as u8,
+                (v >> 16 & 0xff) as u8,
+                (v >> 8 & 0xff) as u8,
+                (v & 0xff) as u8,
+            ],
+            _ => Vec::from([&[b'L'], v.to_be_bytes().as_ref()].concat()),
+        };
+        self.writer.write_all(&bytes).map_err(From::from)
+    }
+
     fn serialize_int(&mut self, v: i32) -> Result<()> {
         let bytes = match v {
             -16..=47 => vec![(0x90 + v) as u8],
             -2048..=2047 => vec![(((v >> 8) & 0xff) + 0xc8) as u8, (v & 0xff) as u8],
-            -262144..=262143 => vec![
+            -262_144..=262_143 => vec![
                 (((v >> 16) & 0xff) + 0xd4) as u8,
                 ((v >> 8) & 0xff) as u8,
                 (v & 0xff) as u8,
@@ -217,5 +239,18 @@ mod tests {
     #[test]
     fn test_encode_null() {
         test_encode_ok(Value::Null, &[b'N']);
+    }
+
+    #[test]
+    fn test_encode_long() {
+        test_encode_ok(Value::Long(262144), &[0x59, 0x00, 0x04, 0x00, 0x00]);
+        test_encode_ok(
+            Value::Long(i32::max_value() as i64),
+            &[0x59, 0x7f, 0xff, 0xff, 0xff],
+        );
+        test_encode_ok(
+            Value::Long(i32::max_value() as i64 + 1),
+            &[b'L', 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00],
+        );
     }
 }
