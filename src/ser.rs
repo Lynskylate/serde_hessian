@@ -136,7 +136,7 @@ impl<W: io::Write> Serializer<W> {
                 .map_err(From::from);
         }
         for (last, chunk) in v.chunks(0xffff).identify_last() {
-            let flag = if last { b'B' } else { b'b' };
+            let flag = if last { b'B' } else { b'A' };
             let len_bytes = (v.len() as u16).to_be_bytes();
             let res = self.writer.write_all(&[flag]).and_then(|_| {
                 self.writer
