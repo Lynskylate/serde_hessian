@@ -79,14 +79,23 @@ impl<R: Read> Deserializer<R> {
 
     fn read_int(&mut self, i: Integer) -> Result<Value> {
         match i {
-            Integer::DirectInt(b) => Ok(Value::Int((b - 0x90) as i32)),
+            Integer::DirectInt(b) => Ok(Value::Int(b as i32 - 0x90)),
             Integer::ByteInt(b) => self
                 .read_byte()
-                .and_then(|b2| Ok(Value::Int(i16::from_be_bytes([b - 0xc8, b2]) as i32)))
+                .and_then(|b2| {
+                    Ok(Value::Int(
+                        i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
+                    ))
+                })
                 .map_err(From::from),
             Integer::ShortInt(b) => self
                 .read_bytes(2)
-                .and_then(|bs| Ok(Value::Int(i32::from_be_bytes([0x00, b, bs[0], bs[1]]))))
+                //TODO: Optimize the code style
+                .and_then(|bs| {
+                    Ok(Value::Int(
+                        i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
+                    ))
+                })
                 .map_err(From::from),
             Integer::NormalInt => self
                 .read_bytes(4)
@@ -128,6 +137,19 @@ mod tests {
     #[test]
     fn test_decode_int() {
         test_decode_ok(&[b'I', 0x00, 0x00, 0x00, 0x00], Value::Int(0));
+        test_decode_ok(&[0x90u8], Value::Int(0));
+        test_decode_ok(&[0x80u8], Value::Int(-16));
+        test_decode_ok(&[0xbfu8], Value::Int(47));
+        test_decode_ok(&[0xc8u8, 0x30u8], Value::Int(48));
+
+        test_decode_ok(&[0xc0, 0x00], Value::Int(-2048));
+        test_decode_ok(&[0xc7, 0x00], Value::Int(-256));
+        test_decode_ok(&[0xcf, 0xff], Value::Int(2047));
+
+        test_decode_ok(&[0xd0, 0x00, 0x00], Value::Int(-262144));
+        test_decode_ok(&[0xd7, 0xff, 0xff], Value::Int(262143));
+
+        test_decode_ok(&[b'I', 0x00, 0x04, 0x00, 0x00], Value::Int(262144));
     }
 
     #[test]

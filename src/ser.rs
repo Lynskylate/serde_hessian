@@ -174,7 +174,7 @@ impl<W: io::Write> Serializer<W> {
         } else {
             // Split long string to many chunks
             for (last, chunk) in will_write_bytes.chunks(0xffff).identify_last() {
-                let flag = if last { 'S' as u8 } else { 0x52 };
+                let flag = if last { b'S' } else { 0x52 };
                 let len_bytes = (v.len() as u16).to_be_bytes();
                 let res = self.writer.write_all(&[flag]).and_then(|_| {
                     self.writer
