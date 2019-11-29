@@ -1,11 +1,12 @@
 use std::collections::BTreeMap;
 use std::io::{BufReader, Read};
 
-use super::constant::{Binary, ByteCodecType};
+use super::constant::{Binary, ByteCodecType, Integer};
 use super::error::Error::{IoError, SyntaxError};
 use super::error::{Error, ErrorCode, Result};
 use super::value::Value;
 use crate::value::Value::Null;
+use std::convert::TryInto;
 
 type MemoId = u32;
 
@@ -59,23 +60,50 @@ impl<R: Read> Deserializer<R> {
         Ok(Null)
     }
 
+    fn read_binary(&mut self, bin: Binary) -> Result<Value> {
+        match bin {
+            Binary::ShortBinary(b) => self
+                .read_bytes((b - 0x20) as usize)
+                .and_then(|b| Ok(Value::Bytes(b)))
+                .map_err(From::from),
+            Binary::TwoOctetBinary(b) => self
+                .read_byte()
+                .and_then(|second_byte| {
+                    self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)
+                })
+                .and_then(|v| Ok(Value::Bytes(v)))
+                .map_err(From::from),
+            Binary::LongBinary(b) => self.read_long_binary(b).map_err(From::from),
+        }
+    }
+
+    fn read_int(&mut self, i: Integer) -> Result<Value> {
+        match i {
+            Integer::DirectInt(b) => Ok(Value::Int((b - 0x90) as i32)),
+            Integer::ByteInt(b) => self
+                .read_byte()
+                .and_then(|b2| Ok(Value::Int(i16::from_be_bytes([b - 0xc8, b2]) as i32)))
+                .map_err(From::from),
+            Integer::ShortInt(b) => self
+                .read_bytes(2)
+                .and_then(|bs| Ok(Value::Int(i32::from_be_bytes([0x00, b, bs[0], bs[1]]))))
+                .map_err(From::from),
+            Integer::NormalInt => self
+                .read_bytes(4)
+                .and_then(|bs| {
+                    Ok(Value::Int(i32::from_be_bytes(
+                        bs.as_slice().try_into().unwrap(),
+                    )))
+                })
+                .map_err(From::from),
+        }
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
-            ByteCodecType::Binary(bin) => match bin {
-                Binary::ShortBinary(b) => self
-                    .read_bytes((b - 0x20) as usize)
-                    .and_then(|b| Ok(Value::Bytes(b)))
-                    .map_err(From::from),
-                Binary::TwoOctetBinary(b) => self
-                    .read_byte()
-                    .and_then(|second_byte| {
-                        self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)
-                    })
-                    .and_then(|v| Ok(Value::Bytes(v)))
-                    .map_err(From::from),
-                Binary::LongBinary(b) => self.read_long_binary(b).map_err(From::from),
-            },
+            ByteCodecType::Int(i) => self.read_int(i),
+            ByteCodecType::Binary(bin) => self.read_binary(bin),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
@@ -96,6 +124,12 @@ mod tests {
         assert!(value.is_ok());
         assert_eq!(value.ok().unwrap(), target);
     }
+
+    #[test]
+    fn test_decode_int() {
+        test_decode_ok(&[b'I', 0x00, 0x00, 0x00, 0x00], Value::Int(0));
+    }
+
     #[test]
     fn test_short_binary() {}
 
