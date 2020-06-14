@@ -1,4 +1,3 @@
-use crate::value::Value::Bytes;
 
 pub enum Binary {
     ShortBinary(u8),
