@@ -56,8 +56,21 @@ impl<R: Read> Deserializer<R> {
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
-        //Todo: Implement for long binary
-        Ok(Null)
+        let mut buf = Vec::new();
+        let mut tag = tag;
+        // Get all chunk starts with 'b'
+        while tag == b'b' {
+            // TODO: Use the byteorder crate instead
+            let length_bytes = self.read_bytes(2)?;
+            let length = i16::from_be_bytes([length_bytes[0], length_bytes[1]]) as usize;
+            buf.extend_from_slice(&self.read_bytes(length)?);
+            tag = self.read_byte()?;
+        }
+        // Get the last chunk starts with 'B'
+        let length_bytes = self.read_bytes(2)?;
+        let length = i16::from_be_bytes([length_bytes[0], length_bytes[1]]) as usize;
+        buf.extend_from_slice(&self.read_bytes(length)?);
+        Ok(Value::Bytes(buf))
     }
 
     fn read_binary(&mut self, bin: Binary) -> Result<Value> {
