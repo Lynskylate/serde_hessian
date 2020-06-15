@@ -102,10 +102,24 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    fn read_double(&mut self, tag: u8) -> Result<Value> {
+        let val = match tag {
+            b'D' => self.buffer.read_f64::<BigEndian>()?,
+            0x5b => 0.0,
+            0x5c => 1.0,
+            0x5d => self.buffer.read_i8()? as f64,
+            0x5e => self.buffer.read_i16::<BigEndian>()? as f64,
+            0x5f => (self.buffer.read_i32::<BigEndian>()? as f64) * 0.001,
+            _ => todo!(),
+        };
+        Ok(Value::Double(val))
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
             ByteCodecType::Int(i) => self.read_int(i),
+            ByteCodecType::Double(d) => self.read_double(d),
             ByteCodecType::Binary(bin) => self.read_binary(bin),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
@@ -143,6 +157,19 @@ mod tests {
         test_decode_ok(&[0xd7, 0xff, 0xff], Value::Int(262143));
 
         test_decode_ok(&[b'I', 0x00, 0x04, 0x00, 0x00], Value::Int(262144));
+    }
+
+    #[test]
+    fn test_decode_double() {
+        test_decode_ok(&[0x5b], Value::Double(0.0));
+        test_decode_ok(&[0x5c], Value::Double(1.0));
+        test_decode_ok(&[0x5d, 0x80], Value::Double(-128.0));
+        test_decode_ok(&[0x5e, 0x00, 0x80], Value::Double(128.0));
+        test_decode_ok(&[0x5f, 0x00, 0x00, 0x2f, 0xda], Value::Double(12.25));
+        test_decode_ok(
+            &[b'D', 0x40, 0x28, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00],
+            Value::Double(12.25),
+        );
     }
 
     #[test]
