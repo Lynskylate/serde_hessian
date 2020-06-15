@@ -3,7 +3,7 @@ use std::io::{Cursor, Read};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Integer, Duration};
+use super::constant::{Binary, ByteCodecType, Date, Integer};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorCode, Result};
 use super::value::Value;
@@ -102,27 +102,34 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
-    // date ::= x4a(J) b7 b6 b5 b4 b3 b2 b1 b0  Date represented by a 64-bit long of milliseconds since Jan 1 1970 00:00H, UTC.
-    //      ::= x4b(K) b4 b3 b2 b1 b0           The second form contains a 32-bit int of minutes since Jan 1 1970 00:00H, UTC.
-    fn read_date(&mut self, duration: Duration)->Result<Value> {
-        match duration {
-            Duration::Minutes => {
-                let minutes = self.buffer.read_i32::<BigEndian>()?;
-                Ok(Value::Date((minutes as i64) * 60000))
-            },
-            Duration::MillSeconds => {
-                let millseconds = self.buffer.read_i64::<BigEndian>()?;
-                Ok(Value::Date(millseconds))
-            }
-        }
+    fn read_double(&mut self, tag: u8) -> Result<Value> {
+        let val = match tag {
+            b'D' => self.buffer.read_f64::<BigEndian>()?,
+            0x5b => 0.0,
+            0x5c => 1.0,
+            0x5d => self.buffer.read_i8()? as f64,
+            0x5e => self.buffer.read_i16::<BigEndian>()? as f64,
+            0x5f => (self.buffer.read_i32::<BigEndian>()? as f64) * 0.001,
+            _ => todo!(),
+        };
+        Ok(Value::Double(val))
+    }
+
+    fn read_date(&mut self, d: Date) -> Result<Value> {
+        let val = match d {
+            Date::Millisecond => self.buffer.read_i64::<BigEndian>()?,
+            Date::Minute => self.buffer.read_i32::<BigEndian>()? as i64 * 60000,
+        };
+        Ok(Value::Date(val))
     }
 
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
             ByteCodecType::Int(i) => self.read_int(i),
+            ByteCodecType::Double(d) => self.read_double(d),
+            ByteCodecType::Date(d) => self.read_date(d),
             ByteCodecType::Binary(bin) => self.read_binary(bin),
-            ByteCodecType::Date(duration) => self.read_date(duration),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
@@ -144,9 +151,8 @@ mod tests {
 
     fn test_decode_ok(rdr: &[u8], target: Value) {
         let mut de = Deserializer::new(rdr);
-        let value = de.read_value();
-        assert!(value.is_ok());
-        assert_eq!(value.ok().unwrap(), target);
+        let value = de.read_value().unwrap();
+        assert_eq!(value, target);
     }
 
     #[test]
@@ -168,6 +174,28 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_double() {
+        test_decode_ok(&[0x5b], Value::Double(0.0));
+        test_decode_ok(&[0x5c], Value::Double(1.0));
+        test_decode_ok(&[0x5d, 0x80], Value::Double(-128.0));
+        test_decode_ok(&[0x5e, 0x00, 0x80], Value::Double(128.0));
+        test_decode_ok(&[0x5f, 0x00, 0x00, 0x2f, 0xda], Value::Double(12.25));
+        test_decode_ok(
+            &[b'D', 0x40, 0x28, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00],
+            Value::Double(12.25),
+        );
+    }
+
+    #[test]
+    fn test_decode_date() {
+        test_decode_ok(
+            &[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8],
+            Value::Date(894621091000),
+        );
+        test_decode_ok(&[0x4b, 0x4b, 0x92, 0x0b, 0xa0], Value::Date(76071745920000));
+    }
+
+    #[test]
     fn test_short_binary() {
         test_decode_ok(&[0x20], Value::Bytes(Vec::new()));
         test_decode_ok(&[0x23, 0x01, 0x02, 0x03], Value::Bytes(vec![1, 2, 3]));
@@ -182,10 +210,5 @@ mod tests {
     #[test]
     fn test_null() {
         test_decode_ok(&[b'N'], Value::Null);
-    }
-
-    #[test]
-    fn test_date() {
-        test_decode_ok(&[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8], Value::Date(894621091000));
     }
 }
