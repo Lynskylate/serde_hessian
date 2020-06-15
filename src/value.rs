@@ -177,6 +177,12 @@ impl<'a> ToHessian for &'a str {
     }
 }
 
+impl<'a> ToHessian for &'a String {
+    fn to_hessian(self) -> Value {
+        Value::String(self.to_owned())
+    }
+}
+
 impl<'a> ToHessian for &'a [u8] {
     fn to_hessian(self) -> Value {
         Value::Bytes(self.to_owned())
