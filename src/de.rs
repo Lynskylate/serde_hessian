@@ -1,26 +1,24 @@
 use std::collections::BTreeMap;
-use std::io::{BufReader, Read};
+use std::io::{Cursor, Read};
+
+use byteorder::{BigEndian, ReadBytesExt};
 
 use super::constant::{Binary, ByteCodecType, Integer};
 use super::error::Error::{IoError, SyntaxError};
-use super::error::{Error, ErrorCode, Result};
+use super::error::{ErrorCode, Result};
 use super::value::Value;
-use crate::value::Value::Null;
-use std::convert::TryInto;
 
 type MemoId = u32;
 
-pub struct Deserializer<R: Read> {
-    buffer: BufReader<R>,
-    pos: usize,
+pub struct Deserializer<R: AsRef<[u8]>> {
+    buffer: Cursor<R>,
     references: BTreeMap<MemoId, Value>,
 }
 
-impl<R: Read> Deserializer<R> {
+impl<R: AsRef<[u8]>> Deserializer<R> {
     pub fn new(rd: R) -> Deserializer<R> {
         Deserializer {
-            buffer: BufReader::new(rd),
-            pos: 0,
+            buffer: Cursor::new(rd),
             references: BTreeMap::new(),
         }
     }
@@ -31,28 +29,14 @@ impl<R: Read> Deserializer<R> {
 
     #[inline]
     fn read_byte(&mut self) -> Result<u8> {
-        let mut b = [0];
-        match self.buffer.read(&mut b) {
-            Ok(1) => {
-                self.pos += 1;
-                Ok(b[0])
-            }
-            Ok(_) => self.error(ErrorCode::EofWhileParsing),
-            Err(e) => Err(IoError(e)),
-        }
+        Ok(self.buffer.read_u8()?)
     }
 
     #[inline]
     fn read_bytes(&mut self, n: usize) -> Result<Vec<u8>> {
-        let mut buf = Vec::new();
-        match self.buffer.by_ref().take(n as u64).read_to_end(&mut buf) {
-            Ok(m) if m == n => {
-                self.pos += n;
-                Ok(buf)
-            }
-            Ok(_) => self.error(ErrorCode::EofWhileParsing),
-            Err(e) => Err(Error::IoError(e)),
-        }
+        let mut buf = vec![0; n];
+        self.buffer.read_exact(&mut buf)?;
+        Ok(buf)
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -60,15 +44,12 @@ impl<R: Read> Deserializer<R> {
         let mut tag = tag;
         // Get all chunk starts with 'b'
         while tag == b'b' {
-            // TODO: Use the byteorder crate instead
-            let length_bytes = self.read_bytes(2)?;
-            let length = i16::from_be_bytes([length_bytes[0], length_bytes[1]]) as usize;
+            let length = self.buffer.read_i16::<BigEndian>()? as usize;
             buf.extend_from_slice(&self.read_bytes(length)?);
             tag = self.read_byte()?;
         }
         // Get the last chunk starts with 'B'
-        let length_bytes = self.read_bytes(2)?;
-        let length = i16::from_be_bytes([length_bytes[0], length_bytes[1]]) as usize;
+        let length = self.buffer.read_i16::<BigEndian>()? as usize;
         buf.extend_from_slice(&self.read_bytes(length)?);
         Ok(Value::Bytes(buf))
     }
@@ -102,10 +83,8 @@ impl<R: Read> Deserializer<R> {
                 ))
             }
             Integer::NormalInt => {
-                let bs = self.read_bytes(4)?;
-                Ok(Value::Int(i32::from_be_bytes(
-                    bs.as_slice().try_into().unwrap(),
-                )))
+                let val = self.buffer.read_i32::<BigEndian>()?;
+                Ok(Value::Int(val))
             }
         }
     }

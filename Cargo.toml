@@ -10,3 +10,4 @@ license = "GPL-3.0-or-later"
 
 [dependencies]
 ordered-float = "1.0"
+byteorder = "1.3.4"
