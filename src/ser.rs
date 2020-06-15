@@ -130,18 +130,15 @@ impl<W: io::Write> Serializer<W> {
 
     fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
         if v.len() < 16 {
-            self.writer
-                .write(&[(v.len() - 0x20) as u8])
-                .and_then(|_| self.writer.write_all(&v))?;
+            self.writer.write(&[(v.len() - 0x20) as u8])?;
+            self.writer.write_all(&v)?;
         } else {
             for (last, chunk) in v.chunks(0xffff).identify_last() {
                 let flag = if last { b'B' } else { b'A' };
                 let len_bytes = (v.len() as u16).to_be_bytes();
-                self.writer.write_all(&[flag]).and_then(|_| {
-                    self.writer
-                        .write_all(&len_bytes)
-                        .and_then(|_| self.writer.write_all(chunk))
-                })?;
+                self.writer.write_all(&[flag])?;
+                self.writer.write_all(&len_bytes)?;
+                self.writer.write_all(chunk)?
             }
         }
         Ok(())
@@ -156,29 +153,22 @@ impl<W: io::Write> Serializer<W> {
         let will_write_bytes = v.as_bytes();
         let will_write_bytes_len = will_write_bytes.len();
         if will_write_bytes_len <= 0x1f {
-            self.writer
-                .write_all(&[will_write_bytes_len as u8])
-                .and_then(|_| self.writer.write_all(will_write_bytes))?;
+            self.writer.write_all(&[will_write_bytes_len as u8])?;
+            self.writer.write_all(will_write_bytes)?;
         } else if will_write_bytes_len < 1024 {
-            self.writer
-                .write_all(&[
-                    (0x30 + ((will_write_bytes_len >> 8) & 0xff)) as u8,
-                    (will_write_bytes_len & 0xff) as u8,
-                ])
-                .and_then(|_| self.writer.write_all(will_write_bytes))?;
+            self.writer.write_all(&[
+                (0x30 + ((will_write_bytes_len >> 8) & 0xff)) as u8,
+                (will_write_bytes_len & 0xff) as u8,
+            ])?;
+            self.writer.write_all(will_write_bytes)?;
         } else {
             // Split long string to many chunks
             for (last, chunk) in will_write_bytes.chunks(0xffff).identify_last() {
                 let flag = if last { b'S' } else { 0x52 };
                 let len_bytes = (v.len() as u16).to_be_bytes();
-                let res = self.writer.write_all(&[flag]).and_then(|_| {
-                    self.writer
-                        .write_all(&len_bytes)
-                        .and_then(|_| self.writer.write_all(chunk))
-                });
-                if let Err(e) = res {
-                    return Err(Error::IoError(e));
-                }
+                self.writer.write_all(&[flag])?;
+                self.writer.write_all(&len_bytes)?;
+                self.writer.write_all(chunk)?;
             }
         }
         Ok(())

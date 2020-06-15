@@ -75,15 +75,12 @@ impl<R: Read> Deserializer<R> {
 
     fn read_binary(&mut self, bin: Binary) -> Result<Value> {
         match bin {
-            Binary::ShortBinary(b) => self
-                .read_bytes((b - 0x20) as usize)
-                .and_then(|b| Ok(Value::Bytes(b))),
-            Binary::TwoOctetBinary(b) => self
-                .read_byte()
-                .and_then(|second_byte| {
-                    self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)
-                })
-                .and_then(|v| Ok(Value::Bytes(v))),
+            Binary::ShortBinary(b) => Ok(Value::Bytes(self.read_bytes((b - 0x20) as usize)?)),
+            Binary::TwoOctetBinary(b) => {
+                let second_byte = self.read_byte()?;
+                let v = self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)?;
+                Ok(Value::Bytes(v))
+            }
             Binary::LongBinary(b) => self.read_long_binary(b),
         }
     }
@@ -91,28 +88,25 @@ impl<R: Read> Deserializer<R> {
     fn read_int(&mut self, i: Integer) -> Result<Value> {
         match i {
             Integer::DirectInt(b) => Ok(Value::Int(b as i32 - 0x90)),
-            Integer::ByteInt(b) => self
-                .read_byte()
-                .and_then(|b2| {
-                    Ok(Value::Int(
-                        i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
-                    ))
-                }),
-            Integer::ShortInt(b) => self
-                .read_bytes(2)
+            Integer::ByteInt(b) => {
+                let b2 = self.read_byte()?;
+                Ok(Value::Int(
+                    i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
+                ))
+            }
+            Integer::ShortInt(b) => {
+                let bs = self.read_bytes(2)?;
                 //TODO: Optimize the code style
-                .and_then(|bs| {
-                    Ok(Value::Int(
-                        i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
-                    ))
-                }),
-            Integer::NormalInt => self
-                .read_bytes(4)
-                .and_then(|bs| {
-                    Ok(Value::Int(i32::from_be_bytes(
-                        bs.as_slice().try_into().unwrap(),
-                    )))
-                }),
+                Ok(Value::Int(
+                    i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
+                ))
+            }
+            Integer::NormalInt => {
+                let bs = self.read_bytes(4)?;
+                Ok(Value::Int(i32::from_be_bytes(
+                    bs.as_slice().try_into().unwrap(),
+                )))
+            }
         }
     }
 
