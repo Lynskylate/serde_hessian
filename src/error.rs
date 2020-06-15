@@ -8,6 +8,7 @@ pub enum ErrorCode {
     UnknownType,
 }
 
+#[derive(Debug)]
 pub enum Error {
     SyntaxError(ErrorCode),
     IoError(io::Error),

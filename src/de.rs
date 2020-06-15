@@ -42,15 +42,28 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
         let mut buf = Vec::new();
         let mut tag = tag;
-        // Get all chunk starts with 'b'
-        while tag == b'b' {
+        // Get non-final chunk starts with 'A'
+        while tag == b'A' {
             let length = self.buffer.read_i16::<BigEndian>()? as usize;
             buf.extend_from_slice(&self.read_bytes(length)?);
             tag = self.read_byte()?;
         }
-        // Get the last chunk starts with 'B'
-        let length = self.buffer.read_i16::<BigEndian>()? as usize;
-        buf.extend_from_slice(&self.read_bytes(length)?);
+
+        // FIXME: refactor duplicated code with read_binary
+        match tag {
+            b'B' => {
+                // Get the last chunk starts with 'B'
+                let length = self.buffer.read_i16::<BigEndian>()? as usize;
+                buf.extend_from_slice(&self.read_bytes(length)?);
+            }
+            0x20..=0x2f => buf.extend_from_slice(&self.read_bytes((tag - 0x20) as usize)?),
+            0x34..=0x37 => {
+                let second_byte = self.read_byte()?;
+                let v = self.read_bytes(i16::from_be_bytes([tag - 0x34, second_byte]) as usize)?;
+                buf.extend_from_slice(&v);
+            }
+            _ => { /* TODO: error */ }
+        }
         Ok(Value::Bytes(buf))
     }
 
