@@ -182,3 +182,9 @@ impl<'a> ToHessian for &'a [u8] {
         Value::Bytes(self.to_owned())
     }
 }
+
+impl<'a> ToHessian for &'a Vec<u8> {
+    fn to_hessian(self) -> Value {
+        Value::Bytes(self.to_owned())
+    }
+}
