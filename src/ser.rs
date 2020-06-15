@@ -1,6 +1,6 @@
 use std::io;
 
-use byteorder::{WriteBytesExt, BigEndian};
+use byteorder::{BigEndian, WriteBytesExt};
 
 use super::error::{Error, ErrorCode, Result};
 use super::value::Value;
@@ -247,9 +247,11 @@ mod tests {
         );
     }
 
-
     #[test]
     fn test_encode_date() {
-        test_encode_ok(Value::Date(894621091000), &[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8])
+        test_encode_ok(
+            Value::Date(894621091000),
+            &[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8],
+        )
     }
 }
