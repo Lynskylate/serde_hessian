@@ -3,7 +3,7 @@ use std::io::{Cursor, Read};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Integer};
+use super::constant::{Binary, ByteCodecType, Integer, Duration};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorCode, Result};
 use super::value::Value;
@@ -102,11 +102,27 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    // date ::= x4a(J) b7 b6 b5 b4 b3 b2 b1 b0  Date represented by a 64-bit long of milliseconds since Jan 1 1970 00:00H, UTC.
+    //      ::= x4b(K) b4 b3 b2 b1 b0           The second form contains a 32-bit int of minutes since Jan 1 1970 00:00H, UTC.
+    fn read_date(&mut self, duration: Duration)->Result<Value> {
+        match duration {
+            Duration::Minutes => {
+                let minutes = self.buffer.read_i32::<BigEndian>()?;
+                Ok(Value::Date((minutes as i64) * 60000))
+            },
+            Duration::MillSeconds => {
+                let millseconds = self.buffer.read_i64::<BigEndian>()?;
+                Ok(Value::Date(millseconds))
+            }
+        }
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
             ByteCodecType::Int(i) => self.read_int(i),
             ByteCodecType::Binary(bin) => self.read_binary(bin),
+            ByteCodecType::Date(duration) => self.read_date(duration),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
@@ -166,5 +182,10 @@ mod tests {
     #[test]
     fn test_null() {
         test_decode_ok(&[b'N'], Value::Null);
+    }
+
+    #[test]
+    fn test_date() {
+        test_decode_ok(&[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8], Value::Date(894621091000));
     }
 }
