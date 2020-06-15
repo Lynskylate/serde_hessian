@@ -64,16 +64,14 @@ impl<R: Read> Deserializer<R> {
         match bin {
             Binary::ShortBinary(b) => self
                 .read_bytes((b - 0x20) as usize)
-                .and_then(|b| Ok(Value::Bytes(b)))
-                .map_err(From::from),
+                .and_then(|b| Ok(Value::Bytes(b))),
             Binary::TwoOctetBinary(b) => self
                 .read_byte()
                 .and_then(|second_byte| {
                     self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)
                 })
-                .and_then(|v| Ok(Value::Bytes(v)))
-                .map_err(From::from),
-            Binary::LongBinary(b) => self.read_long_binary(b).map_err(From::from),
+                .and_then(|v| Ok(Value::Bytes(v))),
+            Binary::LongBinary(b) => self.read_long_binary(b),
         }
     }
 
@@ -86,8 +84,7 @@ impl<R: Read> Deserializer<R> {
                     Ok(Value::Int(
                         i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
                     ))
-                })
-                .map_err(From::from),
+                }),
             Integer::ShortInt(b) => self
                 .read_bytes(2)
                 //TODO: Optimize the code style
@@ -95,16 +92,14 @@ impl<R: Read> Deserializer<R> {
                     Ok(Value::Int(
                         i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
                     ))
-                })
-                .map_err(From::from),
+                }),
             Integer::NormalInt => self
                 .read_bytes(4)
                 .and_then(|bs| {
                     Ok(Value::Int(i32::from_be_bytes(
                         bs.as_slice().try_into().unwrap(),
                     )))
-                })
-                .map_err(From::from),
+                }),
         }
     }
 

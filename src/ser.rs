@@ -74,12 +74,14 @@ impl<W: io::Write> Serializer<W> {
     }
 
     fn serialize_null(&mut self) -> Result<()> {
-        self.writer.write_all(&[b'N']).map_err(From::from)
+        self.writer.write_all(&[b'N'])?;
+        Ok(())
     }
 
     fn serialize_bool(&mut self, value: bool) -> Result<()> {
         let f = if value { b'T' } else { b'F' };
-        self.writer.write_all(&[f]).map_err(From::from)
+        self.writer.write_all(&[f])?;
+        Ok(())
     }
 
     fn serialize_long(&mut self, v: i64) -> Result<()> {
@@ -100,7 +102,8 @@ impl<W: io::Write> Serializer<W> {
             ],
             _ => Vec::from([&[b'L'], v.to_be_bytes().as_ref()].concat()),
         };
-        self.writer.write_all(&bytes).map_err(From::from)
+        self.writer.write_all(&bytes)?;
+        Ok(())
     }
 
     fn serialize_int(&mut self, v: i32) -> Result<()> {
@@ -121,27 +124,24 @@ impl<W: io::Write> Serializer<W> {
             ],
         };
 
-        self.writer.write_all(&bytes).map_err(From::from)
+        self.writer.write_all(&bytes)?;
+        Ok(())
     }
 
     fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
         if v.len() < 16 {
-            return self
-                .writer
+            self.writer
                 .write(&[(v.len() - 0x20) as u8])
-                .and_then(|_| self.writer.write_all(&v))
-                .map_err(From::from);
-        }
-        for (last, chunk) in v.chunks(0xffff).identify_last() {
-            let flag = if last { b'B' } else { b'A' };
-            let len_bytes = (v.len() as u16).to_be_bytes();
-            let res = self.writer.write_all(&[flag]).and_then(|_| {
-                self.writer
-                    .write_all(&len_bytes)
-                    .and_then(|_| self.writer.write_all(chunk))
-            });
-            if let Err(e) = res {
-                return Err(Error::IoError(e));
+                .and_then(|_| self.writer.write_all(&v))?;
+        } else {
+            for (last, chunk) in v.chunks(0xffff).identify_last() {
+                let flag = if last { b'B' } else { b'A' };
+                let len_bytes = (v.len() as u16).to_be_bytes();
+                self.writer.write_all(&[flag]).and_then(|_| {
+                    self.writer
+                        .write_all(&len_bytes)
+                        .and_then(|_| self.writer.write_all(chunk))
+                })?;
             }
         }
         Ok(())
@@ -158,16 +158,14 @@ impl<W: io::Write> Serializer<W> {
         if will_write_bytes_len <= 0x1f {
             self.writer
                 .write_all(&[will_write_bytes_len as u8])
-                .and_then(|_| self.writer.write_all(will_write_bytes))
-                .map_err(From::from)
+                .and_then(|_| self.writer.write_all(will_write_bytes))?;
         } else if will_write_bytes_len < 1024 {
             self.writer
                 .write_all(&[
                     (0x30 + ((will_write_bytes_len >> 8) & 0xff)) as u8,
                     (will_write_bytes_len & 0xff) as u8,
                 ])
-                .and_then(|_| self.writer.write_all(will_write_bytes))
-                .map_err(From::from)
+                .and_then(|_| self.writer.write_all(will_write_bytes))?;
         } else {
             // Split long string to many chunks
             for (last, chunk) in will_write_bytes.chunks(0xffff).identify_last() {
@@ -182,8 +180,8 @@ impl<W: io::Write> Serializer<W> {
                     return Err(Error::IoError(e));
                 }
             }
-            Ok(())
         }
+        Ok(())
     }
 }
 
