@@ -1,5 +1,7 @@
 use std::io;
 
+use byteorder::{BigEndian, WriteBytesExt};
+
 use super::error::{Error, ErrorCode, Result};
 use super::value::Value;
 
@@ -69,8 +71,15 @@ impl<W: io::Write> Serializer<W> {
             Value::Bool(b) => self.serialize_bool(b),
             Value::Null => self.serialize_null(),
             Value::Long(l) => self.serialize_long(l),
+            Value::Date(d) => self.serialize_date(d),
             _ => Err(Error::SyntaxError(ErrorCode::UnknownType)),
         }
+    }
+
+    fn serialize_date(&mut self, d: i64) -> Result<()> {
+        self.writer.write_all(&[0x4a])?;
+        self.writer.write_i64::<BigEndian>(d)?;
+        Ok(())
     }
 
     fn serialize_null(&mut self) -> Result<()> {
@@ -236,5 +245,13 @@ mod tests {
             Value::Long(i32::max_value() as i64 + 1),
             &[b'L', 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00],
         );
+    }
+
+    #[test]
+    fn test_encode_date() {
+        test_encode_ok(
+            Value::Date(894621091000),
+            &[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8],
+        )
     }
 }
