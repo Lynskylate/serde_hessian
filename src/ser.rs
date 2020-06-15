@@ -1,10 +1,7 @@
-use std::borrow::BorrowMut;
 use std::io;
 
 use super::error::{Error, ErrorCode, Result};
 use super::value::Value;
-use core::fmt::Write;
-use std::hash::Hasher;
 
 pub struct Serializer<W> {
     writer: W,
@@ -195,7 +192,6 @@ mod tests {
     use super::Serializer;
     use crate::value::Value;
     use crate::value::Value::Int;
-    use std::ops::Deref;
 
     fn test_encode_ok(value: Value, target: &[u8]) {
         let mut ser = Serializer::new(Vec::new());

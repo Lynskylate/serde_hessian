@@ -125,7 +125,6 @@ impl<R: Read> Deserializer<R> {
 mod tests {
     use super::Deserializer;
     use crate::value::Value;
-    use std::io::BufReader;
 
     fn test_decode_ok(rdr: &[u8], target: Value) {
         let mut de = Deserializer::new(rdr);
