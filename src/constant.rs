@@ -1,4 +1,3 @@
-
 pub enum Binary {
     ShortBinary(u8),
     TwoOctetBinary(u8),

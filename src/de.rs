@@ -4,7 +4,7 @@ use std::io::{Cursor, Read};
 use byteorder::{BigEndian, ReadBytesExt};
 
 use super::constant::{Binary, ByteCodecType, Integer};
-use super::error::Error::{IoError, SyntaxError};
+use super::error::Error::SyntaxError;
 use super::error::{ErrorCode, Result};
 use super::value::Value;
 

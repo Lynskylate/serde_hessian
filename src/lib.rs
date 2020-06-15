@@ -4,4 +4,4 @@ pub mod error;
 pub mod ser;
 mod value;
 
-pub use value::{Value, ToHessian};
+pub use value::{ToHessian, Value};
