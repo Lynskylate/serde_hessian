@@ -14,6 +14,7 @@ pub enum Value {
     Int(i32),
     Long(i64),
     Double(f64),
+    Date(i64),
     Bytes(Vec<u8>),
     String(String),
     Ref(u32),
@@ -40,6 +41,7 @@ impl Hash for Value {
             Int(i) => i.hash(state),
             Long(l) => l.hash(state),
             Double(d) => OrderedFloat(d).hash(state),
+            Date(d) => d.hash(state),
             Bytes(ref bytes) => bytes.hash(state),
             String(ref s) => s.hash(state),
             Ref(i) => i.hash(state),
@@ -64,6 +66,7 @@ impl Ord for Value {
                 Int(i) => (b as i32).cmp(&i),
                 Long(l) => (b as i64).cmp(&l),
                 Double(d) => float_ord(b as i64 as f64, d),
+                Date(d) => (b as i64).cmp(&d),
                 _ => Ordering::Less,
             },
             Int(i) => match *other {
@@ -72,6 +75,7 @@ impl Ord for Value {
                 Int(i2) => i.cmp(&i2),
                 Long(l) => (i as i64).cmp(&l),
                 Double(d) => float_ord(i as f64, d),
+                Date(d) => (i as i64).cmp(&d),
                 _ => Ordering::Less,
             },
             Long(l) => match *other {
@@ -80,6 +84,7 @@ impl Ord for Value {
                 Int(i2) => l.cmp(&(i2 as i64)),
                 Long(l2) => l.cmp(&l2),
                 Double(d) => float_ord(l as f64, d),
+                Date(d) => l.cmp(&d),
                 _ => Ordering::Less,
             },
             Double(d) => match *other {
@@ -88,6 +93,16 @@ impl Ord for Value {
                 Int(i) => float_ord(d, i as f64),
                 Long(l) => float_ord(d, l as f64),
                 Double(d2) => float_ord(d, d2),
+                Date(d2) => float_ord(d, d2 as f64),
+                _ => Ordering::Less,
+            },
+            Date(d) => match *other {
+                Null => Ordering::Greater,
+                Bool(b) => d.cmp(&(b as i64)),
+                Int(i2) => d.cmp(&(i2 as i64)),
+                Long(l2) => d.cmp(&l2),
+                Double(d2) => float_ord(d as f64, d2),
+                Date(d2) => d.cmp(&d2),
                 _ => Ordering::Less,
             },
             Bytes(ref bs) => match *other {
