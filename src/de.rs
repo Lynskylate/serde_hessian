@@ -147,7 +147,10 @@ mod tests {
     }
 
     #[test]
-    fn test_short_binary() {}
+    fn test_short_binary() {
+        test_decode_ok(&[0x20], Value::Bytes(Vec::new()));
+        test_decode_ok(&[0x23, 0x01, 0x02, 0x03], Value::Bytes(vec![1, 2, 3]));
+    }
 
     #[test]
     fn test_boolean() {
