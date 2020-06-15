@@ -60,3 +60,12 @@ jobs:
         with:
           command: fmt
           args: --all -- --check
+
+  fuzz:
+    name: Fuzz
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v2
+      - uses: dtolnay/rust-toolchain@nightly
+      - run: cargo install cargo-fuzz --debug
+      - run: cargo fuzz build -O
