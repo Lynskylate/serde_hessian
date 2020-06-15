@@ -56,55 +56,57 @@ impl<R: Read> Deserializer<R> {
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
-        //Todo: Implement for long binary
-        Ok(Null)
+        let mut buf = Vec::new();
+        let mut tag = tag;
+        // Get all chunk starts with 'b'
+        while tag == b'b' {
+            // TODO: Use the byteorder crate instead
+            let length_bytes = self.read_bytes(2)?;
+            let length = i16::from_be_bytes([length_bytes[0], length_bytes[1]]) as usize;
+            buf.extend_from_slice(&self.read_bytes(length)?);
+            tag = self.read_byte()?;
+        }
+        // Get the last chunk starts with 'B'
+        let length_bytes = self.read_bytes(2)?;
+        let length = i16::from_be_bytes([length_bytes[0], length_bytes[1]]) as usize;
+        buf.extend_from_slice(&self.read_bytes(length)?);
+        Ok(Value::Bytes(buf))
     }
 
     fn read_binary(&mut self, bin: Binary) -> Result<Value> {
         match bin {
-            Binary::ShortBinary(b) => self
-                .read_bytes((b - 0x20) as usize)
-                .and_then(|b| Ok(Value::Bytes(b)))
-                .map_err(From::from),
-            Binary::TwoOctetBinary(b) => self
-                .read_byte()
-                .and_then(|second_byte| {
-                    self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)
-                })
-                .and_then(|v| Ok(Value::Bytes(v)))
-                .map_err(From::from),
-            Binary::LongBinary(b) => self.read_long_binary(b).map_err(From::from),
+            Binary::ShortBinary(b) => Ok(Value::Bytes(self.read_bytes((b - 0x20) as usize)?)),
+            Binary::TwoOctetBinary(b) => {
+                let second_byte = self.read_byte()?;
+                let v = self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)?;
+                Ok(Value::Bytes(v))
+            }
+            Binary::LongBinary(b) => self.read_long_binary(b),
         }
     }
 
     fn read_int(&mut self, i: Integer) -> Result<Value> {
         match i {
             Integer::DirectInt(b) => Ok(Value::Int(b as i32 - 0x90)),
-            Integer::ByteInt(b) => self
-                .read_byte()
-                .and_then(|b2| {
-                    Ok(Value::Int(
-                        i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
-                    ))
-                })
-                .map_err(From::from),
-            Integer::ShortInt(b) => self
-                .read_bytes(2)
+            Integer::ByteInt(b) => {
+                let b2 = self.read_byte()?;
+                Ok(Value::Int(
+                    i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
+                ))
+            }
+            Integer::ShortInt(b) => {
+                let bs = self.read_bytes(2)?;
                 //TODO: Optimize the code style
-                .and_then(|bs| {
-                    Ok(Value::Int(
-                        i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
-                    ))
-                })
-                .map_err(From::from),
-            Integer::NormalInt => self
-                .read_bytes(4)
-                .and_then(|bs| {
-                    Ok(Value::Int(i32::from_be_bytes(
-                        bs.as_slice().try_into().unwrap(),
-                    )))
-                })
-                .map_err(From::from),
+                Ok(Value::Int(
+                    i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
+                ))
+            }
+            Integer::NormalInt => {
+                let bs = self.read_bytes(4)?;
+                Ok(Value::Int(i32::from_be_bytes(
+                    bs.as_slice().try_into().unwrap(),
+                )))
+            }
         }
     }
 
@@ -152,7 +154,10 @@ mod tests {
     }
 
     #[test]
-    fn test_short_binary() {}
+    fn test_short_binary() {
+        test_decode_ok(&[0x20], Value::Bytes(Vec::new()));
+        test_decode_ok(&[0x23, 0x01, 0x02, 0x03], Value::Bytes(vec![1, 2, 3]));
+    }
 
     #[test]
     fn test_boolean() {
