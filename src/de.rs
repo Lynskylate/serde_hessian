@@ -3,7 +3,7 @@ use std::io::{Cursor, Read};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Integer};
+use super::constant::{Binary, ByteCodecType, Date, Integer};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorCode, Result};
 use super::value::Value;
@@ -115,11 +115,20 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::Double(val))
     }
 
+    fn read_date(&mut self, d: Date) -> Result<Value> {
+        let val = match d {
+            Date::Millisecond => self.buffer.read_i64::<BigEndian>()?,
+            Date::Minute => self.buffer.read_i32::<BigEndian>()? as i64 * 60000,
+        };
+        Ok(Value::Date(val))
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
             ByteCodecType::Int(i) => self.read_int(i),
             ByteCodecType::Double(d) => self.read_double(d),
+            ByteCodecType::Date(d) => self.read_date(d),
             ByteCodecType::Binary(bin) => self.read_binary(bin),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
@@ -136,9 +145,8 @@ mod tests {
 
     fn test_decode_ok(rdr: &[u8], target: Value) {
         let mut de = Deserializer::new(rdr);
-        let value = de.read_value();
-        assert!(value.is_ok());
-        assert_eq!(value.ok().unwrap(), target);
+        let value = de.read_value().unwrap();
+        assert_eq!(value, target);
     }
 
     #[test]
@@ -170,6 +178,15 @@ mod tests {
             &[b'D', 0x40, 0x28, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00],
             Value::Double(12.25),
         );
+    }
+
+    #[test]
+    fn test_decode_date() {
+        test_decode_ok(
+            &[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8],
+            Value::Date(894621091000),
+        );
+        test_decode_ok(&[0x4b, 0x4b, 0x92, 0x0b, 0xa0], Value::Date(76071745920000));
     }
 
     #[test]

@@ -11,12 +11,18 @@ pub enum Integer {
     NormalInt,
 }
 
+pub enum Date {
+    Millisecond,
+    Minute,
+}
+
 pub enum ByteCodecType {
     True,
     False,
     Null,
     Int(Integer),
     Double(u8),
+    Date(Date),
     Binary(Binary),
     Unknown,
 }
@@ -35,6 +41,9 @@ impl ByteCodecType {
             b'I' => ByteCodecType::Int(Integer::NormalInt),
             // Double
             b'D' | 0x5b..=0x5f => ByteCodecType::Double(c),
+            // Date
+            0x4a => ByteCodecType::Date(Date::Millisecond),
+            0x4b => ByteCodecType::Date(Date::Minute),
             // Binary
             0x20..=0x2f => ByteCodecType::Binary(Binary::ShortBinary(c)),
             0x34..=0x37 => ByteCodecType::Binary(Binary::TwoOctetBinary(c)),
