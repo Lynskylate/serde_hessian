@@ -115,6 +115,12 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 }
 
+pub fn value_from_slice(v: &[u8]) -> Result<Value> {
+    let mut de = Deserializer::new(v);
+    let value = de.read_value()?;
+    Ok(value)
+}
+
 #[cfg(test)]
 mod tests {
     use super::Deserializer;
