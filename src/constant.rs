@@ -24,6 +24,8 @@ pub enum ByteCodecType {
     Double(u8),
     Date(Date),
     Binary(Binary),
+    // TODO: use enum to eliminate impossible states
+    String(u8),
     Unknown,
 }
 
@@ -47,7 +49,9 @@ impl ByteCodecType {
             // Binary
             0x20..=0x2f => ByteCodecType::Binary(Binary::ShortBinary(c)),
             0x34..=0x37 => ByteCodecType::Binary(Binary::TwoOctetBinary(c)),
-            b'B' | b'A' => ByteCodecType::Binary(Binary::LongBinary(c)),
+            b'B' | 0x41 => ByteCodecType::Binary(Binary::LongBinary(c)),
+            // String
+            0x00..=0x1f | 0x30..=0x33 | 0x52 | b'S' => ByteCodecType::String(c),
             _ => ByteCodecType::Unknown,
         }
     }
