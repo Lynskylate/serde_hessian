@@ -67,5 +67,5 @@ jobs:
     steps:
       - uses: actions/checkout@v2
       - uses: dtolnay/rust-toolchain@nightly
-      - run: cargo install cargo-fuzz --debug
-      - run: cargo fuzz build -O
+      - run: cargo install cargo-fuzz
+      - run: cargo fuzz run fuzz_parsing -- -max_total_time=60 -max_len=10240
