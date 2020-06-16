@@ -26,3 +26,16 @@ fn test_int_roundtrip() {
     roundtrip_test(Int(262143));
     roundtrip_test(Int(262144));
 }
+
+#[test]
+fn test_string_roundtrip() {
+    roundtrip_test(String("".to_string()));
+    roundtrip_test(String("abc".to_string()));
+    // FIXME: String serialization is wrong for non-ascii?
+    // http://hessian.caucho.com/doc/hessian-serialization.html##string
+    // The length is the number of 16-bit characters, which may be different than the number of bytes.
+    // roundtrip_test(String("中文 Chinese".to_string()));
+    roundtrip_test(String("abcdefghijklmnopqrstuvwxyz".to_string()));
+    roundtrip_test(String("abcdefghij".repeat(120)));
+    roundtrip_test(String("abcdefghij".repeat(1000)));
+}

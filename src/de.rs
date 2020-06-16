@@ -45,7 +45,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         let mut buf = Vec::new();
         let mut tag = tag;
         // Get non-final chunk starts with 'A'
-        while tag == b'A' {
+        while tag == 0x41 {
             let length = self.buffer.read_i16::<BigEndian>()? as usize;
             buf.extend_from_slice(&self.read_bytes(length)?);
             tag = self.read_byte()?;
@@ -125,6 +125,73 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::Date(val))
     }
 
+    fn read_utf8_string(&mut self, len: usize) -> Result<Vec<u8>> {
+        let mut s = Vec::new();
+        let mut len = len;
+        while len > 0 {
+            let byte = self.read_byte()?;
+            match byte {
+                0x00..=0x7f => s.push(byte),
+                0xc2..=0xdf => {
+                    s.push(byte);
+                    s.push(self.read_byte()?);
+                }
+                0xe0..=0xef => {
+                    s.push(byte);
+                    let mut buf = [0; 2];
+                    self.buffer.read_exact(&mut buf)?;
+                    s.extend_from_slice(&buf);
+                }
+                0xf0..=0xf4 => {
+                    s.push(byte);
+                    let mut buf = [0; 3];
+                    self.buffer.read_exact(&mut buf)?;
+                    s.extend_from_slice(&buf);
+                }
+                _ => {}
+            }
+            len = len - 1;
+        }
+        Ok(s)
+    }
+
+    fn read_string_internal(&mut self, tag: u8) -> Result<Vec<u8>> {
+        // TODO: remove unnecessary copying
+        let mut buf = Vec::new();
+        match tag {
+            // ::= [x00-x1f] <utf8-data>         # string of length 0-31
+            0x00..=0x1f => {
+                let len = tag as usize - 0x00;
+                buf.extend_from_slice(&self.read_utf8_string(len)?);
+            }
+            // ::= [x30-x34] <utf8-data>         # string of length 0-1023
+            0x30..=0x33 => {
+                let len = (tag as usize - 0x30) * 256 + self.read_byte()? as usize;
+                buf.extend_from_slice(&self.read_utf8_string(len)?);
+            }
+            // x52 ('R') represents any non-final chunk
+            0x52 => {
+                let len = self.buffer.read_u16::<BigEndian>()? as usize;
+                buf.extend_from_slice(&self.read_utf8_string(len)?);
+                let next_tag = self.read_byte()?;
+                buf.extend_from_slice(&self.read_string_internal(next_tag)?);
+            }
+            // x53 ('S') represents the final chunk
+            0x53 => {
+                let len = self.buffer.read_u16::<BigEndian>()? as usize;
+                buf.extend_from_slice(&self.read_utf8_string(len)?);
+            }
+            _ => { /* should not happen */ }
+        }
+        Ok(buf)
+    }
+
+    fn read_string(&mut self, tag: u8) -> Result<Value> {
+        let buf = self.read_string_internal(tag)?;
+        let s = unsafe { String::from_utf8_unchecked(buf) };
+        Ok(Value::String(s))
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
@@ -132,6 +199,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::Double(d) => self.read_double(d),
             ByteCodecType::Date(d) => self.read_date(d),
             ByteCodecType::Binary(bin) => self.read_binary(bin),
+            ByteCodecType::String(s) => self.read_string(s),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),

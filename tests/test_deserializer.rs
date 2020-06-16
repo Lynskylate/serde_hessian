@@ -37,3 +37,19 @@ fn test_decode_date() {
         Value::Date(-128849018940000)
     );
 }
+
+#[test]
+fn test_decode_string() {
+    assert_eq!(
+        load_value_from_file("tests/fixtures/string/empty.bin").unwrap(),
+        Value::String("".to_string())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/string/foo.bin").unwrap(),
+        Value::String("foo".to_string())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/string/chinese.bin").unwrap(),
+        Value::String("中文 Chinese".to_string())
+    );
+}
