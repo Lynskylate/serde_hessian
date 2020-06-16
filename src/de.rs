@@ -1,5 +1,5 @@
 use std::collections::BTreeMap;
-use std::io::{Cursor, Read};
+use std::io::{self, Cursor, Read};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
@@ -34,9 +34,11 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
 
     #[inline]
     fn read_bytes(&mut self, n: usize) -> Result<Vec<u8>> {
-        let mut buf = vec![0; n];
-        self.buffer.read_exact(&mut buf)?;
-        Ok(buf)
+        let mut buf = Vec::new();
+        match self.buffer.by_ref().take(n as u64).read_to_end(&mut buf)? {
+            m if m == n => Ok(buf),
+            _ => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Unexpected EOF").into()),
+        }
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
