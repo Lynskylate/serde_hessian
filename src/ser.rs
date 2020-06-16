@@ -2,7 +2,7 @@ use std::io;
 
 use byteorder::{BigEndian, WriteBytesExt};
 
-use super::error::{Error, ErrorCode, Result};
+use super::error::{Error, ErrorKind, Result};
 use super::value::Value;
 
 pub struct Serializer<W> {
@@ -72,7 +72,7 @@ impl<W: io::Write> Serializer<W> {
             Value::Null => self.serialize_null(),
             Value::Long(l) => self.serialize_long(l),
             Value::Date(d) => self.serialize_date(d),
-            _ => Err(Error::SyntaxError(ErrorCode::UnknownType)),
+            _ => Err(Error::SyntaxError(ErrorKind::UnknownType)),
         }
     }
 

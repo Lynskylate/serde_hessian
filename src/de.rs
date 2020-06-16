@@ -5,7 +5,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 
 use super::constant::{Binary, ByteCodecType, Date, Integer};
 use super::error::Error::SyntaxError;
-use super::error::{ErrorCode, Result};
+use super::error::{ErrorKind, Result};
 use super::value::Value;
 
 type MemoId = u32;
@@ -23,7 +23,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
-    fn error<T>(&self, err: ErrorCode) -> Result<T> {
+    fn error<T>(&self, err: ErrorKind) -> Result<T> {
         Err(SyntaxError(err))
     }
 
@@ -133,7 +133,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
-            _ => self.error(ErrorCode::UnknownType),
+            _ => self.error(ErrorKind::UnknownType),
         }
     }
 }

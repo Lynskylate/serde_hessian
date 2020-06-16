@@ -3,14 +3,13 @@ use std::io;
 use std::result;
 
 #[derive(Clone, PartialEq, Debug)]
-pub enum ErrorCode {
-    EofWhileParsing,
+pub enum ErrorKind {
     UnknownType,
 }
 
 #[derive(Debug)]
 pub enum Error {
-    SyntaxError(ErrorCode),
+    SyntaxError(ErrorKind),
     IoError(io::Error),
 }
 

@@ -1,6 +1,6 @@
 use std::fs;
 
-use hessian_rs::error::Error;
+use hessian_rs::Error;
 use hessian_rs::{de::Deserializer, Value};
 
 fn load_value_from_file(file_name: &str) -> Result<Value, Error> {
@@ -11,9 +11,7 @@ fn load_value_from_file(file_name: &str) -> Result<Value, Error> {
 
 #[test]
 fn test_decode_long_binary() {
-    let rdr = fs::read("tests/fixtures/bytes/65535.bin").unwrap();
-    let mut de = Deserializer::new(rdr);
-    let value = de.read_value().unwrap();
+    let value = load_value_from_file("tests/fixtures/bytes/65535.bin").unwrap();
     match value {
         Value::Bytes(bytes) => assert_eq!(bytes, vec![0x41; 65535]),
         _ => panic!("expect bytes"),
