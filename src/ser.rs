@@ -159,27 +159,47 @@ impl<W: io::Write> Serializer<W> {
     //    ::= [x00-x1f] <utf8-data>
     //    ::= [x30-x33] b0 <utf8-data>
     fn serialize_string(&mut self, v: &str) -> Result<()> {
-        let will_write_bytes = v.as_bytes();
-        let will_write_bytes_len = will_write_bytes.len();
-        if will_write_bytes_len <= 0x1f {
-            self.writer.write_all(&[will_write_bytes_len as u8])?;
-            self.writer.write_all(will_write_bytes)?;
-        } else if will_write_bytes_len < 1024 {
-            self.writer.write_all(&[
-                (0x30 + ((will_write_bytes_len >> 8) & 0xff)) as u8,
-                (will_write_bytes_len & 0xff) as u8,
-            ])?;
-            self.writer.write_all(will_write_bytes)?;
-        } else {
-            // Split long string to many chunks
-            for (last, chunk) in will_write_bytes.chunks(0xffff).identify_last() {
-                let flag = if last { b'S' } else { 0x52 };
-                let len_bytes = (v.len() as u16).to_be_bytes();
-                self.writer.write_all(&[flag])?;
-                self.writer.write_all(&len_bytes)?;
-                self.writer.write_all(chunk)?;
+        const MAX_CHUNK_BYTE_SIZE: u32 = 0x8000;
+        let bytes = v.as_bytes();
+        let mut len = 0;
+        let mut offset = 0;
+        let mut last = 0;
+        let mut i = 0;
+        while i < bytes.len() {
+            len += 1;
+            let byte = bytes[i];
+            if byte & 0x80 > 0 {
+                // more than one byte for this char
+                if byte & 0xe0 == 0xc0 {
+                    i += 2;
+                } else if byte & 0xf0 == 0xe0 {
+                    i += 3;
+                } else {
+                    i += 4;
+                }
+            } else {
+                i += 1;
+            }
+            if len >= MAX_CHUNK_BYTE_SIZE {
+                self.writer.write_u8(b'R')?;
+                self.writer.write_u16::<BigEndian>(len as u16)?;
+                self.writer.write_all(&bytes[offset..i - last])?;
+                len = 0;
+                offset += i;
+                last = i;
             }
         }
+        match len {
+            0..=31 => self.writer.write_u8(len as u8)?,
+            32..=1023 => self
+                .writer
+                .write_all(&[(0x30 + ((len >> 8) & 0xff)) as u8, (len & 0xff) as u8])?,
+            _ => {
+                self.writer.write_u8(b'S')?;
+                self.writer.write_u16::<BigEndian>(len as u16)?;
+            }
+        }
+        self.writer.write_all(&bytes[offset..i - last])?;
         Ok(())
     }
 }
