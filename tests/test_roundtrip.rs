@@ -1,4 +1,8 @@
-use hessian_rs::{ser::Serializer, de::Deserializer, Value::{self, *}};
+use hessian_rs::{
+    de::Deserializer,
+    ser::Serializer,
+    Value::{self, *},
+};
 
 fn roundtrip_test(val: Value) {
     let mut encoded = Vec::new();
