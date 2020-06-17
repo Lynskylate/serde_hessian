@@ -4,6 +4,7 @@ use std::result;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ErrorKind {
+    UnExpectError(String),
     UnknownType,
 }
 

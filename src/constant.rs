@@ -33,6 +33,7 @@ pub enum ByteCodecType {
     True,
     False,
     Null,
+    Definition,
     Int(Integer),
     Long(Long),
     Double(u8),
@@ -50,6 +51,7 @@ impl ByteCodecType {
             b'T' => ByteCodecType::True,
             b'F' => ByteCodecType::False,
             b'N' => ByteCodecType::Null,
+            b'C' => ByteCodecType::Definition,
             // Integer
             0x80..=0xbf => ByteCodecType::Int(Integer::DirectInt(c)),
             0xc0..=0xcf => ByteCodecType::Int(Integer::ByteInt(c)),

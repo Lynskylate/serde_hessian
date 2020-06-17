@@ -10,9 +10,16 @@ use super::value::Value;
 
 type MemoId = u32;
 
+struct Defintion {
+    name: String,
+    fields: Vec<String>,
+    length: u64, // use name+length as key to skip known definition
+}
+
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
     references: BTreeMap<MemoId, Value>,
+    classes: Vec<Defintion>,
 }
 
 impl<R: AsRef<[u8]>> Deserializer<R> {
@@ -20,6 +27,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Deserializer {
             buffer: Cursor::new(rd),
             references: BTreeMap::new(),
+            classes: Vec::new(),
         }
     }
 
@@ -39,6 +47,43 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             m if m == n => Ok(buf),
             _ => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Unexpected EOF").into()),
         }
+    }
+
+    fn read_definition(&mut self) -> Result<()> {
+        let start_position = self.buffer.position();
+        // TODO(lynskylate@gmail.com): optimize error
+        let name = match self.read_value() {
+            Ok(Value::String(n)) => Ok(n),
+            _ => self.error(ErrorKind::UnknownType),
+        }?;
+        let length = match self.read_value() {
+            Ok(Value::Int(l)) => Ok(l),
+            _ => self.error(ErrorKind::UnknownType),
+        }?;
+
+        let mut fields = Vec::new();
+
+        for _ in 0..length {
+            match self.read_value() {
+                Ok(Value::String(s)) => fields.push(s),
+                Ok(v) => {
+                    return self.error(ErrorKind::UnExpectError(format!(
+                        "Expect get string, but get {}",
+                        &v
+                    )))
+                }
+                _ => {
+                    return self.error(ErrorKind::UnknownType);
+                }
+            }
+        }
+
+        self.classes.push(Defintion {
+            name: name,
+            fields: fields,
+            length: self.buffer.position() - start_position,
+        });
+        Ok(())
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -225,6 +270,10 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
+            ByteCodecType::Definition => {
+                self.read_definition()?;
+                self.read_value()
+            }
             _ => self.error(ErrorKind::UnknownType),
         }
     }
