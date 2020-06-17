@@ -72,6 +72,7 @@ impl<W: io::Write> Serializer<W> {
             Value::Null => self.serialize_null(),
             Value::Long(l) => self.serialize_long(l),
             Value::Date(d) => self.serialize_date(d),
+            Value::Double(d) => self.serialize_double(d),
             _ => Err(Error::SyntaxError(ErrorKind::UnknownType)),
         }
     }
@@ -134,6 +135,35 @@ impl<W: io::Write> Serializer<W> {
         };
 
         self.writer.write_all(&bytes)?;
+        Ok(())
+    }
+
+    fn serialize_double(&mut self, v: f64) -> Result<()> {
+        let int_v = v.trunc() as i32;
+        if int_v as f64 == v {
+            match int_v {
+                0 => self.writer.write_u8(0x5b)?,
+                1 => self.writer.write_u8(0x5c)?,
+                -128..=127 => {
+                    self.writer.write_u8(0x5d)?;
+                    self.writer.write_u8(int_v as u8)?;
+                }
+                -32768..=32767 => {
+                    self.writer.write_u8(0x5e)?;
+                    self.writer.write_i16::<BigEndian>(int_v as i16)?;
+                }
+                _ => {}
+            }
+        } else {
+            let mills = v * 1000.0;
+            if mills * 0.001 == v {
+                self.writer.write_u8(0x5f)?;
+                self.writer.write_i32::<BigEndian>(mills as i32)?;
+            } else {
+                self.writer.write_u8(0x44)?;
+                self.writer.write_f64::<BigEndian>(v)?;
+            }
+        }
         Ok(())
     }
 
@@ -275,6 +305,19 @@ mod tests {
         test_encode_ok(
             Value::Long(i32::max_value() as i64 + 1),
             &[b'L', 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00],
+        );
+    }
+
+    #[test]
+    fn test_encode_double() {
+        test_encode_ok(Value::Double(0.0), &[0x5b]);
+        test_encode_ok(Value::Double(1.0), &[0x5c]);
+        test_encode_ok(Value::Double(127.0), &[0x5d, 0x7f]);
+        test_encode_ok(Value::Double(-32768.0), &[0x5e, 0x80, 0x00]);
+        test_encode_ok(Value::Double(12.25), &[0x5f, 0x00, 0x00, 0x2f, 0xda]);
+        test_encode_ok(
+            Value::Double(32767.99999),
+            &[0x44, 0x40, 0xdf, 0xff, 0xff, 0xff, 0xd6, 0x0e, 0x95],
         );
     }
 

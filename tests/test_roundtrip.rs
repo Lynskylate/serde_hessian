@@ -45,6 +45,25 @@ fn test_long_roundtrip() {
 }
 
 #[test]
+fn test_double_roundtrip() {
+    roundtrip_test(Double(0.0));
+    roundtrip_test(Double(1.0));
+    roundtrip_test(Double(-128.0));
+    roundtrip_test(Double(10.0));
+    roundtrip_test(Double(127.0));
+    roundtrip_test(Double(-32768.0));
+    roundtrip_test(Double(32767.0));
+    roundtrip_test(Double(32766.0));
+    roundtrip_test(Double(12.25));
+    roundtrip_test(Double(32767.99999));
+}
+
+#[test]
+fn test_date_roundtrip() {
+    roundtrip_test(Date(894621091000));
+}
+
+#[test]
 fn test_string_roundtrip() {
     roundtrip_test(String("".to_string()));
     roundtrip_test(String("abc".to_string()));
