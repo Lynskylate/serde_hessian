@@ -3,8 +3,8 @@ extern crate ordered_float;
 use ordered_float::OrderedFloat;
 use std::cmp::Ordering;
 use std::collections::HashMap;
+use std::fmt;
 use std::hash::{Hash, Hasher};
-//use std::collections::BTreeMap;
 
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
@@ -192,5 +192,38 @@ impl<'a> ToHessian for &'a [u8] {
 impl<'a> ToHessian for &'a Vec<u8> {
     fn to_hessian(self) -> Value {
         Value::Bytes(self.to_owned())
+    }
+}
+
+impl fmt::Display for Value {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        match *self {
+            Value::Null => write!(f, "None"),
+            Value::Bool(b) => write!(f, "{}", if b { "True" } else { "False" }),
+            Value::Int(ref i) => write!(f, "{}", i),
+            Value::Double(ref v) => write!(f, "{}", v),
+            Value::Date(v) => write!(f, "Date({})", v),
+            Value::Bytes(ref b) => write!(f, "b{:?}", b), //
+            Value::String(ref s) => write!(f, "{:?}", s),
+            Value::List(ref l) => {
+                write!(f, "[")?;
+                for (inx, v) in l.iter().enumerate() {
+                    if inx < l.len() - 1 {
+                        write!(f, "{}, ", v)?;
+                    } else {
+                        write!(f, "{}", v)?;
+                    }
+                }
+                write!(f, "]")
+            }
+            Value::Map(ref m) => {
+                write!(f, "{{")?;
+                for (key, value) in m.iter() {
+                    write!(f, "{} : {},", key, value)?;
+                }
+                write!(f, "}}")
+            }
+            _ => write!(f, "{}", "<Unknown Type>"),
+        }
     }
 }
