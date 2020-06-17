@@ -266,6 +266,33 @@ mod tests {
     }
 
     #[test]
+    fn test_decode_long() {
+        // -8 ~ 15
+        test_decode_ok(&[0xe0], Value::Long(0));
+        test_decode_ok(&[0xd8], Value::Long(-8));
+        test_decode_ok(&[0xd9], Value::Long(-7));
+        test_decode_ok(&[0xef], Value::Long(15));
+        test_decode_ok(&[0xee], Value::Long(14));
+        // -2048 ~ 2047
+        test_decode_ok(&[0xf7, 0xf7], Value::Long(-9));
+        test_decode_ok(&[0xf8, 0x10], Value::Long(16));
+        test_decode_ok(&[0xf0, 0x00], Value::Long(-2048));
+        test_decode_ok(&[0xff, 0xff], Value::Long(2047));
+        // -262144 ~ 262143
+        test_decode_ok(&[0x3f, 0xff, 0xff], Value::Long(262143));
+        test_decode_ok(&[0x38, 0x00, 0x00], Value::Long(-262144));
+        test_decode_ok(&[0x3c, 0x08, 0x00], Value::Long(2048));
+        // -2147483648 ~ 2147483647
+        test_decode_ok(&[0x59, 0x80, 0x00, 0x00, 0x00], Value::Long(-2147483648));
+        test_decode_ok(&[0x59, 0x7f, 0xff, 0xff, 0xff], Value::Long(2147483647));
+        // L
+        test_decode_ok(
+            &[0x4c, 0x00, 0x00, 0x00, 0x00, 0x80, 0x00, 0x00, 0x00],
+            Value::Long(2147483648),
+        );
+    }
+
+    #[test]
     fn test_decode_double() {
         test_decode_ok(&[0x5b], Value::Double(0.0));
         test_decode_ok(&[0x5c], Value::Double(1.0));
