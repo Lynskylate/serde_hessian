@@ -3,7 +3,7 @@ use std::io::{self, Cursor, Read};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Date, Integer};
+use super::constant::{Binary, ByteCodecType, Date, Integer, Long};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
 use super::value::Value;
@@ -104,6 +104,27 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    fn read_long(&mut self, l: Long) -> Result<Value> {
+        match l {
+            Long::DirectLong(b) => Ok(Value::Long(b as i64 - 0xe0)),
+            Long::ByteLong(b) => {
+                let b2 = self.read_byte()?;
+                Ok(Value::Long(
+                    i16::from_be_bytes([b.overflowing_sub(0xf8).0, b2]) as i64,
+                ))
+            }
+            Long::ShortLong(b) => {
+                let bs = self.read_bytes(2)?;
+                Ok(Value::Long(
+                    (i32::from_be_bytes([b.overflowing_sub(0x3c).0, bs[0], bs[1], 0x00]) >> 8)
+                        as i64,
+                ))
+            }
+            Long::Int32Long => Ok(Value::Long(self.buffer.read_i32::<BigEndian>()? as i64)),
+            Long::NormalLong => Ok(Value::Long(self.buffer.read_i64::<BigEndian>()?)),
+        }
+    }
+
     fn read_double(&mut self, tag: u8) -> Result<Value> {
         let val = match tag {
             b'D' => self.buffer.read_f64::<BigEndian>()?,
@@ -196,6 +217,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
             ByteCodecType::Int(i) => self.read_int(i),
+            ByteCodecType::Long(l) => self.read_long(l),
             ByteCodecType::Double(d) => self.read_double(d),
             ByteCodecType::Date(d) => self.read_date(d),
             ByteCodecType::Binary(bin) => self.read_binary(bin),

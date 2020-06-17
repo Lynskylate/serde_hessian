@@ -95,9 +95,9 @@ impl<W: io::Write> Serializer<W> {
 
     fn serialize_long(&mut self, v: i64) -> Result<()> {
         let bytes = match v {
-            -8..=15 => vec![(0xd8 + v) as u8],
-            -2048..=2047 => vec![(((v >> 8) + 0xf0) & 0xff) as u8, (v & 0xff) as u8],
-            -262_144..=262_133 => vec![
+            -8..=15 => vec![(0xe0 + v) as u8],
+            -2048..=2047 => vec![(((v >> 8) + 0xf8) & 0xff) as u8, (v & 0xff) as u8],
+            -262_144..=262_143 => vec![
                 ((v >> 16) + 0x3c) as u8,
                 ((v >> 8) & 0xff) as u8,
                 (v & 0xff) as u8,
@@ -213,7 +213,7 @@ mod tests {
     fn test_encode_ok(value: Value, target: &[u8]) {
         let mut ser = Serializer::new(Vec::new());
         assert!(ser.serialize_value(&value).is_ok());
-        assert_eq!(ser.writer.to_vec(), target);
+        assert_eq!(ser.writer.to_vec(), target, "{:?} encode error", value);
     }
 
     #[test]
@@ -256,6 +256,17 @@ mod tests {
 
     #[test]
     fn test_encode_long() {
+        test_encode_ok(Value::Long(0), &[0xe0]);
+        test_encode_ok(Value::Long(-8), &[0xd8]);
+        test_encode_ok(Value::Long(-7), &[0xd9]);
+        test_encode_ok(Value::Long(15), &[0xef]);
+        test_encode_ok(Value::Long(-9), &[0xf7, 0xf7]);
+        test_encode_ok(Value::Long(16), &[0xf8, 0x10]);
+        test_encode_ok(Value::Long(255), &[0xf8, 0xff]);
+        test_encode_ok(Value::Long(-2048), &[0xf0, 0x00]);
+        test_encode_ok(Value::Long(262143), &[0x3f, 0xff, 0xff]);
+        test_encode_ok(Value::Long(-262144), &[0x38, 0x00, 0x00]);
+        test_encode_ok(Value::Long(2048), &[0x3c, 0x08, 0x00]);
         test_encode_ok(Value::Long(262144), &[0x59, 0x00, 0x04, 0x00, 0x00]);
         test_encode_ok(
             Value::Long(i32::max_value() as i64),

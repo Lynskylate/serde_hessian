@@ -1,9 +1,11 @@
+#[derive(Debug)]
 pub enum Binary {
     ShortBinary(u8),
     TwoOctetBinary(u8),
     LongBinary(u8),
 }
 
+#[derive(Debug)]
 pub enum Integer {
     DirectInt(u8),
     ByteInt(u8),
@@ -11,16 +13,28 @@ pub enum Integer {
     NormalInt,
 }
 
+#[derive(Debug)]
+pub enum Long {
+    DirectLong(u8),
+    ByteLong(u8),
+    ShortLong(u8),
+    Int32Long,
+    NormalLong,
+}
+
+#[derive(Debug)]
 pub enum Date {
     Millisecond,
     Minute,
 }
 
+#[derive(Debug)]
 pub enum ByteCodecType {
     True,
     False,
     Null,
     Int(Integer),
+    Long(Long),
     Double(u8),
     Date(Date),
     Binary(Binary),
@@ -41,6 +55,12 @@ impl ByteCodecType {
             0xc0..=0xcf => ByteCodecType::Int(Integer::ByteInt(c)),
             0xd0..=0xd7 => ByteCodecType::Int(Integer::ShortInt(c)),
             b'I' => ByteCodecType::Int(Integer::NormalInt),
+            // Long
+            0xd8..=0xef => ByteCodecType::Long(Long::DirectLong(c)),
+            0xf0..=0xff => ByteCodecType::Long(Long::ByteLong(c)),
+            0x38..=0x3f => ByteCodecType::Long(Long::ShortLong(c)),
+            0x59 => ByteCodecType::Long(Long::Int32Long),
+            b'L' => ByteCodecType::Long(Long::NormalLong),
             // Double
             b'D' | 0x5b..=0x5f => ByteCodecType::Double(c),
             // Date

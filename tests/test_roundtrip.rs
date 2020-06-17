@@ -7,9 +7,12 @@ use hessian_rs::{
 fn roundtrip_test(val: Value) {
     let mut encoded = Vec::new();
     let mut ser = Serializer::new(&mut encoded);
-    ser.serialize_value(&val).unwrap();
+    ser.serialize_value(&val)
+        .expect(&format!("serialization failed for {:?}", val));
     let mut de = Deserializer::new(&encoded);
-    let decoded = de.read_value().unwrap();
+    let decoded = de
+        .read_value()
+        .expect(&format!("deserialization failed for {:?}", val));
     assert_eq!(decoded, val);
 }
 
@@ -25,6 +28,20 @@ fn test_int_roundtrip() {
     roundtrip_test(Int(-262144));
     roundtrip_test(Int(262143));
     roundtrip_test(Int(262144));
+}
+
+#[test]
+fn test_long_roundtrip() {
+    roundtrip_test(Long(0));
+    roundtrip_test(Long(-16));
+    roundtrip_test(Long(47));
+    roundtrip_test(Long(48));
+    roundtrip_test(Long(-2048));
+    roundtrip_test(Long(-256));
+    roundtrip_test(Long(2047));
+    roundtrip_test(Long(-262144));
+    roundtrip_test(Long(262143));
+    roundtrip_test(Long(262144));
 }
 
 #[test]
