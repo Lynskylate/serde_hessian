@@ -1,25 +1,22 @@
-use std::collections::BTreeMap;
-use std::io::{self, Cursor, Read};
+use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Date, Integer, Long};
+use super::constant::{Binary, ByteCodecType, Date, Integer, List, Long};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
 use super::value::Value;
 
-type MemoId = u32;
-
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
-    references: BTreeMap<MemoId, Value>,
+    type_references: Vec<String>,
 }
 
 impl<R: AsRef<[u8]>> Deserializer<R> {
     pub fn new(rd: R) -> Deserializer<R> {
         Deserializer {
             buffer: Cursor::new(rd),
-            references: BTreeMap::new(),
+            type_references: Vec::new(),
         }
     }
 
@@ -39,6 +36,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             m if m == n => Ok(buf),
             _ => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Unexpected EOF").into()),
         }
+    }
+
+    #[inline]
+    fn peek_byte(&mut self) -> Result<u8> {
+        let tag = self.buffer.read_u8()?;
+        self.buffer.seek(SeekFrom::Current(-1))?;
+        Ok(tag)
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -213,6 +217,73 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::String(s))
     }
 
+    fn read_type(&mut self) -> Result<String> {
+        match self.read_value() {
+            Ok(Value::String(s)) => {
+                self.type_references.push(s.clone());
+                Ok(s)
+            }
+            Ok(Value::Int(i)) => {
+                if let Some(res) = self.type_references.iter().nth(i as usize) {
+                    Ok(res.clone())
+                } else {
+                    self.error(ErrorKind::OutofTypeRefRange(i as usize))
+                }
+            }
+            Ok(_) => self.error(ErrorKind::MisMatchType),
+            Err(e) => Err(e),
+        }
+    }
+
+    fn read_varlength_list_internal(&mut self) -> Result<Vec<Value>> {
+        let mut tag = self.peek_byte()?;
+        let mut list = Vec::new();
+        while tag != b'Z' {
+            list.push(self.read_value()?);
+            tag = self.peek_byte()?;
+        }
+        self.read_byte()?;
+        Ok(list)
+    }
+
+    fn read_exact_length_list_internal(&mut self, length: usize) -> Result<Vec<Value>> {
+        let mut list = Vec::new();
+        for _ in 0..length {
+            list.push(self.read_value()?)
+        }
+        Ok(list)
+    }
+
+    fn read_list(&mut self, list: List) -> Result<Value> {
+        // TODO(lynskylate@gmail.com): Should add list to reference, but i don't know any good way to deal with it
+        match list {
+            List::ShortFixedLengthList(typed, length) => {
+                if typed {
+                    self.read_type()?;
+                }
+                Ok(Value::List(self.read_exact_length_list_internal(length)?))
+            }
+            List::VarLengthList(typed) => {
+                if typed {
+                    self.read_type()?;
+                }
+                Ok(Value::List(self.read_varlength_list_internal()?))
+            }
+            List::FixedLengthList(typed) => {
+                if typed {
+                    self.read_type()?;
+                }
+                if let Value::Int(length) = self.read_value()? {
+                    Ok(Value::List(
+                        self.read_exact_length_list_internal(length as usize)?,
+                    ))
+                } else {
+                    self.error(ErrorKind::MisMatchType)
+                }
+            }
+        }
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
@@ -222,6 +293,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::Date(d) => self.read_date(d),
             ByteCodecType::Binary(bin) => self.read_binary(bin),
             ByteCodecType::String(s) => self.read_string(s),
+            ByteCodecType::List(l) => self.read_list(l),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
@@ -329,5 +401,19 @@ mod tests {
     #[test]
     fn test_null() {
         test_decode_ok(&[b'N'], Value::Null);
+    }
+
+    #[test]
+    fn test_read_list() {
+        //Fixed length typed list
+        test_decode_ok(
+            &[b'V', 0x04, b'[', b'i', b'n', b't', 0x92, 0x90, 0x91],
+            Value::List(vec![Value::Int(0), Value::Int(1)]),
+        );
+        //Untyped variable list
+        test_decode_ok(
+            &[0x57, 0x90, 0x91, b'Z'],
+            Value::List(vec![Value::Int(0), Value::Int(1)]),
+        );
     }
 }

@@ -1,12 +1,14 @@
 use std::io;
 
 use byteorder::{BigEndian, WriteBytesExt};
+use indexmap::IndexSet;
 
 use super::error::{Error, ErrorKind, Result};
 use super::value::Value;
 
 pub struct Serializer<W> {
     writer: W,
+    type_cache: IndexSet<String>,
 }
 
 pub trait IdentifyLast: Iterator + Sized {
@@ -56,7 +58,10 @@ where
 
 impl<W: io::Write> Serializer<W> {
     pub fn new(writer: W) -> Self {
-        Serializer { writer }
+        Serializer {
+            writer: writer,
+            type_cache: IndexSet::new(),
+        }
     }
 
     pub fn into_inner(self) -> W {
@@ -73,8 +78,56 @@ impl<W: io::Write> Serializer<W> {
             Value::Long(l) => self.serialize_long(l),
             Value::Date(d) => self.serialize_date(d),
             Value::Double(d) => self.serialize_double(d),
+            Value::List(ref l) => self.serialize_list(l),
             _ => Err(Error::SyntaxError(ErrorKind::UnknownType)),
         }
+    }
+
+    fn write_type(&mut self, tp: &str) -> Result<()> {
+        if let Some(inx) = self.type_cache.get_index_of(tp) {
+            self.serialize_int(inx as i32)?;
+        } else {
+            self.serialize_string(tp)?;
+            self.type_cache.insert(String::from(tp));
+        }
+        Ok(())
+    }
+
+    fn write_list_begin(&mut self, length: usize, tp: Option<&str>) -> Result<()> {
+        if length <= 7 {
+            if let Some(tp) = tp {
+                self.writer.write_u8((0x70 + length) as u8)?;
+                self.write_type(tp)?;
+            } else {
+                self.writer.write_u8((0x78 + length) as u8)?;
+            }
+        } else {
+            if let Some(tp) = tp {
+                self.writer.write_u8(0x56)?;
+                self.write_type(tp)?;
+            } else {
+                self.writer.write_u8(0x58)?;
+            }
+            self.serialize_int(length as i32)?;
+        }
+
+        Ok(())
+    }
+
+    fn serialize_list_with_type(&mut self, list: Vec<Value>, tp: &str) -> Result<()> {
+        self.write_list_begin(list.len(), Some(tp))?;
+        for i in list.iter() {
+            self.serialize_value(i)?;
+        }
+        Ok(())
+    }
+
+    fn serialize_list(&mut self, list: &Vec<Value>) -> Result<()> {
+        self.write_list_begin(list.len(), None)?;
+        for i in list.iter() {
+            self.serialize_value(i)?;
+        }
+        Ok(())
     }
 
     fn serialize_date(&mut self, d: i64) -> Result<()> {
@@ -327,5 +380,17 @@ mod tests {
             Value::Date(894621091000),
             &[0x4a, 0x00, 0x00, 0x00, 0xd0, 0x4b, 0x92, 0x84, 0xb8],
         )
+    }
+
+    #[test]
+    fn test_encode_type() {
+        let mut ser = Serializer::new(Vec::new());
+        ser.serialize_list_with_type(vec![Value::Int(1)], "test.list")
+            .unwrap();
+        assert_eq!(ser.type_cache.len(), 1);
+        assert_eq!(ser.type_cache.get_index_of("test.list"), Some(0));
+        ser.serialize_list_with_type(vec![Value::Int(2)], "test.list")
+            .unwrap();
+        assert_eq!(ser.type_cache.len(), 1);
     }
 }

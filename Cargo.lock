@@ -17,7 +17,17 @@ name = "hessian_rs"
 version = "0.0.1"
 dependencies = [
  "byteorder",
+ "indexmap",
  "ordered-float",
+]
+
+[[package]]
+name = "indexmap"
+version = "1.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c398b2b113b55809ceb9ee3e753fcbac793f1956663f3c36549c1346015c2afe"
+dependencies = [
+ "autocfg",
 ]
 
 [[package]]

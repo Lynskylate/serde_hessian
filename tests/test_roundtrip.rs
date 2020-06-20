@@ -72,3 +72,15 @@ fn test_string_roundtrip() {
     roundtrip_test(String("abcdefghij".repeat(120)));
     roundtrip_test(String("abcdefghij".repeat(1000)));
 }
+
+#[test]
+fn test_list_roundtrip() {
+    roundtrip_test(List(vec![Int(1), Int(2)]));
+    roundtrip_test(List(vec![
+        String("".to_string()),
+        String("abc".to_string()),
+        String("中文".to_string()),
+    ]));
+    roundtrip_test(List(vec![Int(1); 13]));
+    roundtrip_test(List(vec![String("test".to_string()); 1000]));
+}
