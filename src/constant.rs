@@ -29,6 +29,13 @@ pub enum Date {
 }
 
 #[derive(Debug)]
+pub enum List {
+    VarLengthList(bool /* typed */),
+    FixedLengthList(bool /* typed */),
+    ShortFixedLengthList(bool /* typed */, usize /* length */),
+}
+
+#[derive(Debug)]
 pub enum ByteCodecType {
     True,
     False,
@@ -38,6 +45,7 @@ pub enum ByteCodecType {
     Double(u8),
     Date(Date),
     Binary(Binary),
+    List(List),
     // TODO: use enum to eliminate impossible states
     String(u8),
     Unknown,
@@ -50,6 +58,17 @@ impl ByteCodecType {
             b'T' => ByteCodecType::True,
             b'F' => ByteCodecType::False,
             b'N' => ByteCodecType::Null,
+            // List
+            0x55 => ByteCodecType::List(List::VarLengthList(true)),
+            b'V' => ByteCodecType::List(List::FixedLengthList(true)),
+            0x57 => ByteCodecType::List(List::VarLengthList(false)),
+            0x58 => ByteCodecType::List(List::FixedLengthList(false)),
+            0x70..=0x77 => {
+                ByteCodecType::List(List::ShortFixedLengthList(true, (c - 0x70) as usize))
+            }
+            0x78..=0x7f => {
+                ByteCodecType::List(List::ShortFixedLengthList(false, (c - 0x78) as usize))
+            }
             // Integer
             0x80..=0xbf => ByteCodecType::Int(Integer::DirectInt(c)),
             0xc0..=0xcf => ByteCodecType::Int(Integer::ByteInt(c)),

@@ -5,6 +5,8 @@ use std::result;
 #[derive(Clone, PartialEq, Debug)]
 pub enum ErrorKind {
     UnknownType,
+    MisMatchType,
+    OutofTypeRefRange(usize),
 }
 
 #[derive(Debug)]
