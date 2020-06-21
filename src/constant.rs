@@ -46,6 +46,7 @@ pub enum ByteCodecType {
     Date(Date),
     Binary(Binary),
     List(List),
+    Map(bool /*typed*/),
     // TODO: use enum to eliminate impossible states
     String(u8),
     Unknown,
@@ -58,6 +59,9 @@ impl ByteCodecType {
             b'T' => ByteCodecType::True,
             b'F' => ByteCodecType::False,
             b'N' => ByteCodecType::Null,
+            // Map
+            b'M' => ByteCodecType::Map(true),
+            b'H' => ByteCodecType::Map(false),
             // List
             0x55 => ByteCodecType::List(List::VarLengthList(true)),
             b'V' => ByteCodecType::List(List::FixedLengthList(true)),

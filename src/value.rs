@@ -18,6 +18,7 @@ pub enum Value {
     Bytes(Vec<u8>),
     String(String),
     Ref(u32),
+    //TODO: Add classname for list and Map
     List(Vec<Value>),
     Map(HashMap<Value, Value>),
 }
@@ -127,8 +128,10 @@ impl Ord for Value {
             },
             Map(ref m) => match other {
                 Map(m2) => {
-                    let v1: Vec<_> = m.iter().collect();
-                    let v2: Vec<_> = m2.iter().collect();
+                    let mut v1: Vec<_> = m.iter().collect();
+                    let mut v2: Vec<_> = m2.iter().collect();
+                    v1.sort_by(|l_iter, r_iter| l_iter.0.cmp(r_iter.0));
+                    v2.sort_by(|l_iter, r_iter| l_iter.0.cmp(r_iter.0));
                     v1.cmp(&v2)
                 }
                 _ => Ordering::Greater,

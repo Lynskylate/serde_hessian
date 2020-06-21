@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 use byteorder::{BigEndian, ReadBytesExt};
@@ -235,6 +236,19 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    fn read_varlength_map_interal(&mut self) -> Result<HashMap<Value, Value>> {
+        let mut map = HashMap::new();
+        let mut tag = self.peek_byte()?;
+        while tag != b'Z' {
+            let key = self.read_value()?;
+            let val = self.read_value()?;
+            map.insert(key, val);
+            tag = self.peek_byte()?;
+        }
+        self.read_byte()?;
+        Ok(map)
+    }
+
     fn read_varlength_list_internal(&mut self) -> Result<Vec<Value>> {
         let mut tag = self.peek_byte()?;
         let mut list = Vec::new();
@@ -284,6 +298,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    fn read_map(&mut self, typed: bool) -> Result<Value> {
+        if typed {
+            self.read_type()?;
+        }
+        Ok(Value::Map(self.read_varlength_map_interal()?))
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
@@ -294,6 +315,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::Binary(bin) => self.read_binary(bin),
             ByteCodecType::String(s) => self.read_string(s),
             ByteCodecType::List(l) => self.read_list(l),
+            ByteCodecType::Map(typed) => self.read_map(typed),
             ByteCodecType::True => Ok(Value::Bool(true)),
             ByteCodecType::False => Ok(Value::Bool(false)),
             ByteCodecType::Null => Ok(Value::Null),
@@ -312,6 +334,7 @@ pub fn value_from_slice(v: &[u8]) -> Result<Value> {
 mod tests {
     use super::Deserializer;
     use crate::value::Value;
+    use std::collections::HashMap;
 
     fn test_decode_ok(rdr: &[u8], target: Value) {
         let mut de = Deserializer::new(rdr);
@@ -414,6 +437,30 @@ mod tests {
         test_decode_ok(
             &[0x57, 0x90, 0x91, b'Z'],
             Value::List(vec![Value::Int(0), Value::Int(1)]),
+        );
+    }
+
+    #[test]
+    fn test_read_map() {
+        let mut map = HashMap::new();
+        map.insert(Value::Int(1), Value::String("fee".to_string()));
+        map.insert(Value::Int(16), Value::String("fie".to_string()));
+        map.insert(Value::Int(256), Value::String("foe".to_string()));
+        test_decode_ok(
+            &[
+                b'M', 0x13, b'c', b'o', b'm', b'.', b'c', b'a', b'u', b'c', b'h', b'o', b'.', b't',
+                b'e', b's', b't', b'.', b'c', b'a', b'r', 0x91, 0x03, b'f', b'e', b'e', 0xa0, 0x03,
+                b'f', b'i', b'e', 0xc9, 0x00, 0x03, b'f', b'o', b'e', b'Z',
+            ],
+            Value::Map(map.clone()),
+        );
+
+        test_decode_ok(
+            &[
+                b'H', 0x91, 0x03, b'f', b'e', b'e', 0xa0, 0x03, b'f', b'i', b'e', 0xc9, 0x00, 0x03,
+                b'f', b'o', b'e', b'Z',
+            ],
+            Value::Map(map.clone()),
         );
     }
 }

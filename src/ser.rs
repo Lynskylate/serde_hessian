@@ -1,3 +1,4 @@
+use std::collections::HashMap;
 use std::io;
 
 use byteorder::{BigEndian, WriteBytesExt};
@@ -79,6 +80,7 @@ impl<W: io::Write> Serializer<W> {
             Value::Date(d) => self.serialize_date(d),
             Value::Double(d) => self.serialize_double(d),
             Value::List(ref l) => self.serialize_list(l),
+            Value::Map(ref m) => self.serialize_map(m),
             _ => Err(Error::SyntaxError(ErrorKind::UnknownType)),
         }
     }
@@ -114,11 +116,22 @@ impl<W: io::Write> Serializer<W> {
         Ok(())
     }
 
-    fn serialize_list_with_type(&mut self, list: Vec<Value>, tp: &str) -> Result<()> {
+    fn serialize_list_with_type(&mut self, list: &Vec<Value>, tp: &str) -> Result<()> {
         self.write_list_begin(list.len(), Some(tp))?;
         for i in list.iter() {
             self.serialize_value(i)?;
         }
+        Ok(())
+    }
+
+    fn serialize_map(&mut self, map: &HashMap<Value, Value>) -> Result<()> {
+        // TODO(lynskylate@gmail.com): handle typed map
+        self.writer.write_u8(b'H')?;
+        for (k, v) in map.iter() {
+            self.serialize_value(k)?;
+            self.serialize_value(v)?;
+        }
+        self.writer.write_u8(b'Z')?;
         Ok(())
     }
 
@@ -385,11 +398,11 @@ mod tests {
     #[test]
     fn test_encode_type() {
         let mut ser = Serializer::new(Vec::new());
-        ser.serialize_list_with_type(vec![Value::Int(1)], "test.list")
+        ser.serialize_list_with_type(&vec![Value::Int(1)], "test.list")
             .unwrap();
         assert_eq!(ser.type_cache.len(), 1);
         assert_eq!(ser.type_cache.get_index_of("test.list"), Some(0));
-        ser.serialize_list_with_type(vec![Value::Int(2)], "test.list")
+        ser.serialize_list_with_type(&vec![Value::Int(2)], "test.list")
             .unwrap();
         assert_eq!(ser.type_cache.len(), 1);
     }
