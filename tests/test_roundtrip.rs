@@ -1,3 +1,5 @@
+use std::collections::HashMap;
+
 use hessian_rs::{
     de::Deserializer,
     ser::Serializer,
@@ -83,4 +85,13 @@ fn test_list_roundtrip() {
     ]));
     roundtrip_test(List(vec![Int(1); 13]));
     roundtrip_test(List(vec![String("test".to_string()); 1000]));
+}
+
+#[test]
+fn test_map_roundtrip() {
+    let mut map = HashMap::new();
+    map.insert(Value::Int(1), Value::String("fee".to_string()));
+    map.insert(Value::Int(16), Value::String("fie".to_string()));
+    map.insert(Value::Int(256), Value::String("foe".to_string()));
+    roundtrip_test(Map(map));
 }
