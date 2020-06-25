@@ -79,9 +79,9 @@ impl<W: io::Write> Serializer<W> {
             Value::Long(l) => self.serialize_long(l),
             Value::Date(d) => self.serialize_date(d),
             Value::Double(d) => self.serialize_double(d),
+            Value::Ref(i) => self.serialize_ref(i),
             Value::List(ref l) => self.serialize_list(l),
             Value::Map(ref m) => self.serialize_map(m),
-            _ => Err(Error::SyntaxError(ErrorKind::UnknownType)),
         }
     }
 
@@ -157,6 +157,12 @@ impl<W: io::Write> Serializer<W> {
     fn serialize_bool(&mut self, value: bool) -> Result<()> {
         let f = if value { b'T' } else { b'F' };
         self.writer.write_all(&[f])?;
+        Ok(())
+    }
+
+    fn serialize_ref(&mut self, ref_num: u32) -> Result<()> {
+        self.writer.write_u8(0x51)?;
+        self.serialize_int(ref_num as i32)?;
         Ok(())
     }
 

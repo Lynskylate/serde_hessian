@@ -42,6 +42,7 @@ pub enum ByteCodecType {
     Null,
     Definition,
     Object,
+    Ref,
     Int(Integer),
     Long(Long),
     Double(u8),
@@ -61,6 +62,7 @@ impl ByteCodecType {
             b'T' => ByteCodecType::True,
             b'F' => ByteCodecType::False,
             b'N' => ByteCodecType::Null,
+            0x51 => ByteCodecType::Ref,
             // Map
             b'M' => ByteCodecType::Map(true),
             b'H' => ByteCodecType::Map(false),

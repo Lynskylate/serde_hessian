@@ -368,6 +368,15 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::Map(self.read_varlength_map_interal()?))
     }
 
+    fn read_ref(&mut self) -> Result<Value> {
+        println!("ref ref");
+        if let Value::Int(i) = self.read_value()? {
+            Ok(Value::Ref(i as u32))
+        } else {
+            self.error(ErrorKind::MisMatchType)
+        }
+    }
+
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
@@ -386,6 +395,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 self.read_definition()?;
                 self.read_value()
             },
+            ByteCodecType::Ref => self.read_ref(),
             ByteCodecType::Object => self.read_object(),
             _ => self.error(ErrorKind::UnknownType),
         }
@@ -546,5 +556,17 @@ mod tests {
             Value::Map(map),
         );
 
+    }
+
+    #[test]
+    fn test_read_ref() {
+        let mut map = HashMap::new();
+        map.insert(Value::String("head".to_string()), Value::Int(1));
+        map.insert(Value::String("tail".to_string()), Value::Ref(0));
+        test_decode_ok(&[
+            b'C', 0x0a, b'L', b'i', b'n', b'k', b'e', b'd', b'L', b'i', b's', b't',
+            0x92, 0x04, b'h', b'e', b'a', b'd', 0x04, b't', b'a', b'i', b'l',
+            b'O', 0x90, 0x91, 0x51, 0x90
+        ], Value::Map(map));
     }
 }
