@@ -11,13 +11,13 @@ use super::value::Value;
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
     type_references: Vec<String>,
-    classes: Vec<Defintion>,
+    class_references: Vec<Defintion>,
 }
 
+#[derive(Debug, Clone)]
 struct Defintion {
     name: String,
     fields: Vec<String>,
-    length: u64, // use name+length as key to skip known definition
 }
 
 
@@ -26,7 +26,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Deserializer {
             buffer: Cursor::new(rd),
             type_references: Vec::new(),
-            classes: Vec::new(),
+            class_references: Vec::new(),
         }
     }
 
@@ -56,7 +56,6 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     fn read_definition(&mut self) -> Result<()> {
-        let start_position = self.buffer.position();
         // TODO(lynskylate@gmail.com): optimize error
         let name = match self.read_value() {
             Ok(Value::String(n)) => Ok(n),
@@ -84,12 +83,30 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
         }
 
-        self.classes.push(Defintion {
+        self.class_references.push(Defintion {
             name: name,
             fields: fields,
-            length: self.buffer.position() - start_position,
         });
         Ok(())
+    }
+
+    fn read_object(&mut self) -> Result<Value> {
+        if let Value::Int(i) = self.read_value()? {
+            // TODO(lynskylate@gmail.com): Avoid copy
+            let definition = self.class_references.get(i as usize)
+                .ok_or(SyntaxError(ErrorKind::OutofDefinitionRange(i as usize)))?.clone();
+            
+            let fields_size = definition.fields.len();
+            let mut map = HashMap::new();
+            for i in 0..fields_size {
+                let k = definition.fields[i].clone();
+                let v = self.read_value()?;
+                map.insert(Value::String(k), v);
+            }
+            Ok(Value::Map(map))
+        } else {
+            self.error(ErrorKind::MisMatchType)
+        }
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -368,7 +385,8 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::Definition => {
                 self.read_definition()?;
                 self.read_value()
-            }
+            },
+            ByteCodecType::Object => self.read_object(),
             _ => self.error(ErrorKind::UnknownType),
         }
     }
@@ -512,5 +530,21 @@ mod tests {
             ],
             Value::Map(map.clone()),
         );
+    }
+
+    #[test]
+    fn test_read_object() {
+        let mut map = HashMap::new();
+        map.insert(Value::String("Color".to_string()), Value::String("red".to_string()));
+        map.insert(Value::String("Model".to_string()), Value::String("corvette".to_string()));
+        test_decode_ok(
+            &[
+                b'C', 0x0b, b'e', b'x', b'a', b'm', b'p', b'l', b'e', b'.', b'C', b'a', b'r',
+                0x92, 0x05, b'C', b'o', b'l', b'o', b'r', 0x05, b'M', b'o', b'd', b'e', b'l',
+                b'O', 0x90, 0x03, b'r', b'e', b'd', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
+            ],
+            Value::Map(map),
+        );
+
     }
 }

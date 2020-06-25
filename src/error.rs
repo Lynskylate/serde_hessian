@@ -8,6 +8,7 @@ pub enum ErrorKind {
     UnknownType,
     MisMatchType,
     OutofTypeRefRange(usize),
+    OutofDefinitionRange(usize),
 }
 
 #[derive(Debug)]
