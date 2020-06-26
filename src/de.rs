@@ -6,7 +6,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use super::constant::{Binary, ByteCodecType, Date, Integer, List, Long};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
-use super::value::{Value, Defintion};
+use super::value::{self, Value, Defintion};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
@@ -330,28 +330,45 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         // TODO(lynskylate@gmail.com): Should add list to reference, but i don't know any good way to deal with it
         match list {
             List::ShortFixedLengthList(typed, length) => {
-                if typed {
-                    self.read_type()?;
-                }
-                Ok(Value::List(self.read_exact_length_list_internal(length)?))
+                let list = if typed {
+                    let typ = self.read_type()?;
+                    let val = self.read_exact_length_list_internal(length)?;
+                    value::List::from((typ, val))
+                } else {
+                    let val = self.read_exact_length_list_internal(length)?;
+                    value::List::from(val)
+                };
+                Ok(Value::List(list))
             }
             List::VarLengthList(typed) => {
-                if typed {
-                    self.read_type()?;
-                }
-                Ok(Value::List(self.read_varlength_list_internal()?))
+                let list = if typed {
+                    let typ = self.read_type()?;
+                    let val = self.read_varlength_list_internal()?;
+                    value::List::from((typ, val))
+                } else {
+                    let val = self.read_varlength_list_internal()?;
+                    value::List::from(val)
+                };
+                Ok(Value::List(list))
             }
             List::FixedLengthList(typed) => {
-                if typed {
-                    self.read_type()?;
-                }
-                if let Value::Int(length) = self.read_value()? {
-                    Ok(Value::List(
-                        self.read_exact_length_list_internal(length as usize)?,
-                    ))
+                let list = if typed {
+                    let typ = self.read_type()?;
+                    let length = self
+                        .read_value()?
+                        .as_int()
+                        .ok_or_else(|| SyntaxError(ErrorKind::MisMatchType))?;
+                    let val = self.read_exact_length_list_internal(length as usize)?;
+                    value::List::from((typ, val))
                 } else {
-                    self.error(ErrorKind::MisMatchType)
-                }
+                    let length = self
+                        .read_value()?
+                        .as_int()
+                        .ok_or_else(|| SyntaxError(ErrorKind::MisMatchType))?;
+                    let val = self.read_exact_length_list_internal(length as usize)?;
+                    value::List::from(val)
+                };
+                Ok(Value::List(list))
             }
         }
     }
@@ -502,14 +519,15 @@ mod tests {
     #[test]
     fn test_read_list() {
         //Fixed length typed list
+        // FIXME: should the type be `int` or `[int`?
         test_decode_ok(
             &[b'V', 0x04, b'[', b'i', b'n', b't', 0x92, 0x90, 0x91],
-            Value::List(vec![Value::Int(0), Value::Int(1)]),
+            Value::List(("[int".to_string(), vec![Value::Int(0), Value::Int(1)]).into()),
         );
         //Untyped variable list
         test_decode_ok(
             &[0x57, 0x90, 0x91, b'Z'],
-            Value::List(vec![Value::Int(0), Value::Int(1)]),
+            Value::List(vec![Value::Int(0), Value::Int(1)].into()),
         );
     }
 

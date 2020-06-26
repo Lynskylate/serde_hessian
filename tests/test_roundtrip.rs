@@ -77,14 +77,17 @@ fn test_string_roundtrip() {
 
 #[test]
 fn test_list_roundtrip() {
-    roundtrip_test(List(vec![Int(1), Int(2)]));
-    roundtrip_test(List(vec![
-        String("".to_string()),
-        String("abc".to_string()),
-        String("中文".to_string()),
-    ]));
-    roundtrip_test(List(vec![Int(1); 13]));
-    roundtrip_test(List(vec![String("test".to_string()); 1000]));
+    roundtrip_test(List(vec![Int(1), Int(2)].into()));
+    roundtrip_test(List(
+        vec![
+            String("".to_string()),
+            String("abc".to_string()),
+            String("中文".to_string()),
+        ]
+        .into(),
+    ));
+    roundtrip_test(List(vec![Int(1); 13].into()));
+    roundtrip_test(List(vec![String("test".to_string()); 1000].into()));
 }
 
 #[test]

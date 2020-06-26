@@ -5,7 +5,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use indexmap::{IndexSet, IndexMap};
 
 use super::error::Result;
-use super::value::{Value, Defintion};
+use super::value::{self, Value, Defintion};
 
 pub struct Serializer<W> {
     writer: W,
@@ -138,14 +138,6 @@ impl<W: io::Write> Serializer<W> {
         Ok(())
     }
 
-    fn serialize_list_with_type(&mut self, list: &Vec<Value>, tp: &str) -> Result<()> {
-        self.write_list_begin(list.len(), Some(tp))?;
-        for i in list.iter() {
-            self.serialize_value(i)?;
-        }
-        Ok(())
-    }
-
     fn serialize_map(&mut self, map: &HashMap<Value, Value>) -> Result<()> {
         // TODO(lynskylate@gmail.com): handle typed map
         self.writer.write_u8(b'H')?;
@@ -157,8 +149,10 @@ impl<W: io::Write> Serializer<W> {
         Ok(())
     }
 
-    fn serialize_list(&mut self, list: &Vec<Value>) -> Result<()> {
-        self.write_list_begin(list.len(), None)?;
+    fn serialize_list(&mut self, list: &value::List) -> Result<()> {
+        let tp = list.r#type();
+        let list = list.value();
+        self.write_list_begin(list.len(), tp)?;
         for i in list.iter() {
             self.serialize_value(i)?;
         }
@@ -331,7 +325,7 @@ impl<W: io::Write> Serializer<W> {
 #[cfg(test)]
 mod tests {
     use super::Serializer;
-    use crate::value::Value;
+    use crate::value::{self, Value};
     use crate::value::Value::Int;
 
     fn test_encode_ok(value: Value, target: &[u8]) {
@@ -426,12 +420,12 @@ mod tests {
     #[test]
     fn test_encode_type() {
         let mut ser = Serializer::new(Vec::new());
-        ser.serialize_list_with_type(&vec![Value::Int(1)], "test.list")
-            .unwrap();
+        let first_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
+        ser.serialize_list(&first_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
-        assert_eq!(ser.type_cache.get_index_of("test.list"), Some(0));
-        ser.serialize_list_with_type(&vec![Value::Int(2)], "test.list")
-            .unwrap();
+        assert_eq!(ser.type_cache.get_index_of("[int"), Some(0));
+        let second_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
+        ser.serialize_list(&second_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
     }
 

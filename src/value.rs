@@ -5,6 +5,62 @@ use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
+use std::ops::{Deref, DerefMut};
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
+pub enum List {
+    Typed(String, Vec<Value>),
+    Untyped(Vec<Value>),
+}
+
+impl List {
+    pub fn r#type(&self) -> Option<&str> {
+        match self {
+            List::Typed(ref typ, _) => Some(typ),
+            List::Untyped(_) => None,
+        }
+    }
+
+    pub fn value(&self) -> &[Value] {
+        match self {
+            List::Typed(_, val) => val,
+            List::Untyped(val) => val,
+        }
+    }
+
+    pub fn value_mut(&mut self) -> &mut [Value] {
+        match self {
+            List::Typed(_, val) => val,
+            List::Untyped(val) => val,
+        }
+    }
+}
+
+impl From<Vec<Value>> for List {
+    fn from(val: Vec<Value>) -> Self {
+        Self::Untyped(val)
+    }
+}
+
+impl From<(String, Vec<Value>)> for List {
+    fn from(val: (String, Vec<Value>)) -> Self {
+        Self::Typed(val.0, val.1)
+    }
+}
+
+impl Deref for List {
+    type Target = [Value];
+
+    fn deref(&self) -> &Self::Target {
+        self.value()
+    }
+}
+
+impl DerefMut for List {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.value_mut()
+    }
+}
 
 #[derive(Debug, Clone)]
 pub struct Defintion {
@@ -24,9 +80,27 @@ pub enum Value {
     Bytes(Vec<u8>),
     String(String),
     Ref(u32),
-    //TODO: Add classname for list and Map
-    List(Vec<Value>),
+    //TODO: Add classname and Map
+    List(List),
     Map(HashMap<Value, Value>),
+}
+
+// TODO: Add more accessors
+impl Value {
+    pub fn as_int(&self) -> Option<i32> {
+        if let Value::Int(i) = *self {
+            Some(i)
+        } else {
+            None
+        }
+    }
+
+    pub fn is_int(&self) -> bool {
+        match self {
+            Value::Int(_) => true,
+            _ => false,
+        }
+    }
 }
 
 impl PartialOrd for Value {
