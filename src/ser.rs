@@ -5,7 +5,7 @@ use byteorder::{BigEndian, WriteBytesExt};
 use indexmap::IndexSet;
 
 use super::error::{Error, ErrorKind, Result};
-use super::value::Value;
+use super::value::{self, Value};
 
 pub struct Serializer<W> {
     writer: W,
@@ -135,7 +135,8 @@ impl<W: io::Write> Serializer<W> {
         Ok(())
     }
 
-    fn serialize_list(&mut self, list: &Vec<Value>) -> Result<()> {
+    fn serialize_list(&mut self, list: &value::List) -> Result<()> {
+        let list = list.value();
         self.write_list_begin(list.len(), None)?;
         for i in list.iter() {
             self.serialize_value(i)?;
