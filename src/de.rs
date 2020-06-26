@@ -6,7 +6,7 @@ use byteorder::{BigEndian, ReadBytesExt};
 use super::constant::{Binary, ByteCodecType, Date, Integer, List, Long};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
-use super::value::Value;
+use super::value::{Value, Defintion};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
@@ -14,11 +14,6 @@ pub struct Deserializer<R: AsRef<[u8]>> {
     class_references: Vec<Defintion>,
 }
 
-#[derive(Debug, Clone)]
-struct Defintion {
-    name: String,
-    fields: Vec<String>,
-}
 
 
 impl<R: AsRef<[u8]>> Deserializer<R> {

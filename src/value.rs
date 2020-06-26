@@ -6,6 +6,12 @@ use std::collections::HashMap;
 use std::fmt;
 use std::hash::{Hash, Hasher};
 
+#[derive(Debug, Clone)]
+pub struct Defintion {
+    pub name: String,
+    pub fields: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
     Null,

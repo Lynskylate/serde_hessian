@@ -2,14 +2,15 @@ use std::collections::HashMap;
 use std::io;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use indexmap::IndexSet;
+use indexmap::{IndexSet, IndexMap};
 
-use super::error::{Error, ErrorKind, Result};
-use super::value::Value;
+use super::error::Result;
+use super::value::{Value, Defintion};
 
 pub struct Serializer<W> {
     writer: W,
     type_cache: IndexSet<String>,
+    classes_cache: IndexMap<String, Defintion>,
 }
 
 pub trait IdentifyLast: Iterator + Sized {
@@ -62,6 +63,7 @@ impl<W: io::Write> Serializer<W> {
         Serializer {
             writer: writer,
             type_cache: IndexSet::new(),
+            classes_cache: IndexMap::new(),
         }
     }
 
@@ -82,6 +84,26 @@ impl<W: io::Write> Serializer<W> {
             Value::Ref(i) => self.serialize_ref(i),
             Value::List(ref l) => self.serialize_list(l),
             Value::Map(ref m) => self.serialize_map(m),
+        }
+    }
+
+    // class-def  ::= 'C' string int string*
+    // Write deinition if not exists in classes cache, and return ref num finally
+    pub fn write_definition(&mut self, def: &Defintion) -> Result<usize> {
+        match self.classes_cache.get_index_of(&def.name) {
+            Some(inx) => {
+               Ok(inx)
+            }
+            None => {
+                self.writer.write_u8(b'C')?;
+                self.serialize_string(def.name.as_str())?;
+                self.serialize_int(def.fields.len() as i32)?;
+                for name in &def.fields {
+                    self.serialize_string(name.as_str())?;
+                }
+                self.classes_cache.insert(def.name.clone(), def.clone());
+                Ok(self.classes_cache.len() - 1)
+            }
         }
     }
 
@@ -411,5 +433,17 @@ mod tests {
         ser.serialize_list_with_type(&vec![Value::Int(2)], "test.list")
             .unwrap();
         assert_eq!(ser.type_cache.len(), 1);
+    }
+
+    use crate::value::Defintion;
+    #[test]
+    fn test_encode_definiton() {
+        let def = Defintion{
+            name: "example.Car".to_string(),
+            fields: vec!["color".to_string()],
+        };
+        let mut ser = Serializer::new(Vec::new());
+        assert!(ser.write_definition(&def).unwrap() == 0);
+        assert!(ser.write_definition(&def).unwrap() == 0);
     }
 }
