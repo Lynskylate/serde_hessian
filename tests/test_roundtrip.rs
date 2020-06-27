@@ -3,6 +3,7 @@ use std::collections::HashMap;
 use hessian_rs::{
     de::Deserializer,
     ser::Serializer,
+    value,
     Value::{self, *},
 };
 
@@ -97,4 +98,15 @@ fn test_map_roundtrip() {
     map.insert(Value::Int(16), Value::String("fie".to_string()));
     map.insert(Value::Int(256), Value::String("foe".to_string()));
     roundtrip_test(Map(map.into()));
+    let mut car_map = HashMap::new();
+    car_map.insert(
+        Value::String("color".to_string()),
+        Value::String("aquamarine".to_string()),
+    );
+    car_map.insert(
+        Value::String("model".to_string()),
+        Value::String("Beetle".to_string()),
+    );
+    car_map.insert(Value::String("mileage".to_string()), Value::Int(65536));
+    roundtrip_test(Map(("com.caucho.test.Car", car_map).into()));
 }

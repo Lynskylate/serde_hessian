@@ -7,6 +7,12 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Defintion {
+    pub name: String,
+    pub fields: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum List {
     Typed(String, Vec<Value>),

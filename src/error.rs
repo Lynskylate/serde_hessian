@@ -4,9 +4,11 @@ use std::result;
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ErrorKind {
+    UnExpectError(String),
     UnknownType,
     MisMatchType,
     OutofTypeRefRange(usize),
+    OutofDefinitionRange(usize),
 }
 
 #[derive(Debug)]

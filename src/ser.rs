@@ -1,15 +1,15 @@
-use std::collections::HashMap;
 use std::io;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use indexmap::IndexSet;
+use indexmap::{IndexMap, IndexSet};
 
-use super::error::{Error, ErrorKind, Result};
-use super::value::{self, Value};
+use super::error::Result;
+use super::value::{self, Defintion, Value};
 
 pub struct Serializer<W> {
     writer: W,
     type_cache: IndexSet<String>,
+    classes_cache: IndexMap<String, Defintion>,
 }
 
 pub trait IdentifyLast: Iterator + Sized {
@@ -62,6 +62,7 @@ impl<W: io::Write> Serializer<W> {
         Serializer {
             writer: writer,
             type_cache: IndexSet::new(),
+            classes_cache: IndexMap::new(),
         }
     }
 
@@ -79,9 +80,27 @@ impl<W: io::Write> Serializer<W> {
             Value::Long(l) => self.serialize_long(l),
             Value::Date(d) => self.serialize_date(d),
             Value::Double(d) => self.serialize_double(d),
+            Value::Ref(i) => self.serialize_ref(i),
             Value::List(ref l) => self.serialize_list(l),
             Value::Map(ref m) => self.serialize_map(m),
-            _ => Err(Error::SyntaxError(ErrorKind::UnknownType)),
+        }
+    }
+
+    // class-def  ::= 'C' string int string*
+    // Write deinition if not exists in classes cache, and return ref num finally
+    pub fn write_definition(&mut self, def: &Defintion) -> Result<usize> {
+        match self.classes_cache.get_index_of(&def.name) {
+            Some(inx) => Ok(inx),
+            None => {
+                self.writer.write_u8(b'C')?;
+                self.serialize_string(def.name.as_str())?;
+                self.serialize_int(def.fields.len() as i32)?;
+                for name in &def.fields {
+                    self.serialize_string(name.as_str())?;
+                }
+                self.classes_cache.insert(def.name.clone(), def.clone());
+                Ok(self.classes_cache.len() - 1)
+            }
         }
     }
 
@@ -116,17 +135,16 @@ impl<W: io::Write> Serializer<W> {
         Ok(())
     }
 
-    fn serialize_list_with_type(&mut self, list: &Vec<Value>, tp: &str) -> Result<()> {
-        self.write_list_begin(list.len(), Some(tp))?;
-        for i in list.iter() {
-            self.serialize_value(i)?;
-        }
-        Ok(())
-    }
-
-    fn serialize_map(&mut self, map: &HashMap<Value, Value>) -> Result<()> {
-        // TODO(lynskylate@gmail.com): handle typed map
-        self.writer.write_u8(b'H')?;
+    fn serialize_map(&mut self, map: &value::Map) -> Result<()> {
+        match map.r#type() {
+            Some(tp) => {
+                self.writer.write_u8(b'M')?;
+                self.write_type(tp)?;
+            }
+            None => {
+                self.writer.write_u8(b'H')?;
+            }
+        };
         for (k, v) in map.iter() {
             self.serialize_value(k)?;
             self.serialize_value(v)?;
@@ -136,8 +154,9 @@ impl<W: io::Write> Serializer<W> {
     }
 
     fn serialize_list(&mut self, list: &value::List) -> Result<()> {
+        let tp = list.r#type();
         let list = list.value();
-        self.write_list_begin(list.len(), None)?;
+        self.write_list_begin(list.len(), tp)?;
         for i in list.iter() {
             self.serialize_value(i)?;
         }
@@ -158,6 +177,12 @@ impl<W: io::Write> Serializer<W> {
     fn serialize_bool(&mut self, value: bool) -> Result<()> {
         let f = if value { b'T' } else { b'F' };
         self.writer.write_all(&[f])?;
+        Ok(())
+    }
+
+    fn serialize_ref(&mut self, ref_num: u32) -> Result<()> {
+        self.writer.write_u8(0x51)?;
+        self.serialize_int(ref_num as i32)?;
         Ok(())
     }
 
@@ -304,8 +329,9 @@ impl<W: io::Write> Serializer<W> {
 #[cfg(test)]
 mod tests {
     use super::Serializer;
-    use crate::value::Value;
     use crate::value::Value::Int;
+    use crate::value::{self, Value};
+    use std::collections::HashMap;
 
     fn test_encode_ok(value: Value, target: &[u8]) {
         let mut ser = Serializer::new(Vec::new());
@@ -399,12 +425,24 @@ mod tests {
     #[test]
     fn test_encode_type() {
         let mut ser = Serializer::new(Vec::new());
-        ser.serialize_list_with_type(&vec![Value::Int(1)], "test.list")
-            .unwrap();
+        let first_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
+        ser.serialize_list(&first_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
-        assert_eq!(ser.type_cache.get_index_of("test.list"), Some(0));
-        ser.serialize_list_with_type(&vec![Value::Int(2)], "test.list")
-            .unwrap();
+        assert_eq!(ser.type_cache.get_index_of("[int"), Some(0));
+        let second_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
+        ser.serialize_list(&second_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
+    }
+
+    use crate::value::Defintion;
+    #[test]
+    fn test_encode_definiton() {
+        let def = Defintion {
+            name: "example.Car".to_string(),
+            fields: vec!["color".to_string()],
+        };
+        let mut ser = Serializer::new(Vec::new());
+        assert!(ser.write_definition(&def).unwrap() == 0);
+        assert!(ser.write_definition(&def).unwrap() == 0);
     }
 }

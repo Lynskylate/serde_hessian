@@ -40,6 +40,9 @@ pub enum ByteCodecType {
     True,
     False,
     Null,
+    Definition,
+    Object,
+    Ref,
     Int(Integer),
     Long(Long),
     Double(u8),
@@ -59,6 +62,7 @@ impl ByteCodecType {
             b'T' => ByteCodecType::True,
             b'F' => ByteCodecType::False,
             b'N' => ByteCodecType::Null,
+            0x51 => ByteCodecType::Ref,
             // Map
             b'M' => ByteCodecType::Map(true),
             b'H' => ByteCodecType::Map(false),
@@ -73,6 +77,8 @@ impl ByteCodecType {
             0x78..=0x7f => {
                 ByteCodecType::List(List::ShortFixedLengthList(false, (c - 0x78) as usize))
             }
+            b'O' => ByteCodecType::Object,
+            b'C' => ByteCodecType::Definition,
             // Integer
             0x80..=0xbf => ByteCodecType::Int(Integer::DirectInt(c)),
             0xc0..=0xcf => ByteCodecType::Int(Integer::ByteInt(c)),
