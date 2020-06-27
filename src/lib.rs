@@ -2,7 +2,7 @@ pub mod constant;
 pub mod de;
 mod error;
 pub mod ser;
-mod value;
+pub mod value;
 
 pub use error::{Error, ErrorKind};
-pub use value::{ToHessian, Value};
+pub use value::Value;
