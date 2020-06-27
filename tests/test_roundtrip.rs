@@ -96,5 +96,5 @@ fn test_map_roundtrip() {
     map.insert(Value::Int(1), Value::String("fee".to_string()));
     map.insert(Value::Int(16), Value::String("fie".to_string()));
     map.insert(Value::Int(256), Value::String("foe".to_string()));
-    roundtrip_test(Map(map));
+    roundtrip_test(Map(map.into()));
 }

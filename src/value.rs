@@ -48,6 +48,12 @@ impl From<(String, Vec<Value>)> for List {
     }
 }
 
+impl From<(&str, Vec<Value>)> for List {
+    fn from(val: (&str, Vec<Value>)) -> Self {
+        Self::Typed(val.0.to_string(), val.1)
+    }
+}
+
 impl Deref for List {
     type Target = [Value];
 
@@ -57,6 +63,67 @@ impl Deref for List {
 }
 
 impl DerefMut for List {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        self.value_mut()
+    }
+}
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub enum Map {
+    Typed(String, HashMap<Value, Value>),
+    Untyped(HashMap<Value, Value>),
+}
+
+impl Map {
+    pub fn r#type(&self) -> Option<&str> {
+        match self {
+            Map::Typed(ref typ, _) => Some(typ),
+            Map::Untyped(_) => None,
+        }
+    }
+
+    pub fn value(&self) -> &HashMap<Value, Value> {
+        match self {
+            Map::Typed(_, val) => val,
+            Map::Untyped(val) => val,
+        }
+    }
+
+    pub fn value_mut(&mut self) -> &mut HashMap<Value, Value> {
+        match self {
+            Map::Typed(_, val) => val,
+            Map::Untyped(val) => val,
+        }
+    }
+}
+
+impl From<HashMap<Value, Value>> for Map {
+    fn from(val: HashMap<Value, Value>) -> Self {
+        Self::Untyped(val)
+    }
+}
+
+impl From<(String, HashMap<Value, Value>)> for Map {
+    fn from(val: (String, HashMap<Value, Value>)) -> Self {
+        Self::Typed(val.0, val.1)
+    }
+}
+
+impl From<(&str, HashMap<Value, Value>)> for Map {
+    fn from(val: (&str, HashMap<Value, Value>)) -> Self {
+        Self::Typed(val.0.to_string(), val.1)
+    }
+}
+
+impl Deref for Map {
+    type Target = HashMap<Value, Value>;
+
+    fn deref(&self) -> &Self::Target {
+        self.value()
+    }
+}
+
+impl DerefMut for Map {
     fn deref_mut(&mut self) -> &mut Self::Target {
         self.value_mut()
     }
@@ -74,9 +141,8 @@ pub enum Value {
     Bytes(Vec<u8>),
     String(String),
     Ref(u32),
-    //TODO: Add classname and Map
     List(List),
-    Map(HashMap<Value, Value>),
+    Map(Map),
 }
 
 // TODO: Add more accessors

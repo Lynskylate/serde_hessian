@@ -316,10 +316,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     fn read_map(&mut self, typed: bool) -> Result<Value> {
-        if typed {
-            self.read_type()?;
-        }
-        Ok(Value::Map(self.read_varlength_map_interal()?))
+        let map = if typed {
+            let typ = self.read_type()?;
+            value::Map::from((typ, self.read_varlength_map_interal()?))
+        } else {
+            value::Map::from(self.read_varlength_map_interal()?)
+        };
+        Ok(Value::Map(map))
     }
 
     pub fn read_value(&mut self) -> Result<Value> {
@@ -449,7 +452,7 @@ mod tests {
         // FIXME: should the type be `int` or `[int`?
         test_decode_ok(
             &[b'V', 0x04, b'[', b'i', b'n', b't', 0x92, 0x90, 0x91],
-            Value::List(("[int".to_string(), vec![Value::Int(0), Value::Int(1)]).into()),
+            Value::List(("[int", vec![Value::Int(0), Value::Int(1)]).into()),
         );
         //Untyped variable list
         test_decode_ok(
@@ -470,7 +473,7 @@ mod tests {
                 b'e', b's', b't', b'.', b'c', b'a', b'r', 0x91, 0x03, b'f', b'e', b'e', 0xa0, 0x03,
                 b'f', b'i', b'e', 0xc9, 0x00, 0x03, b'f', b'o', b'e', b'Z',
             ],
-            Value::Map(map.clone()),
+            Value::Map(("com.caucho.test.car", map.clone()).into()),
         );
 
         test_decode_ok(
@@ -478,7 +481,7 @@ mod tests {
                 b'H', 0x91, 0x03, b'f', b'e', b'e', 0xa0, 0x03, b'f', b'i', b'e', 0xc9, 0x00, 0x03,
                 b'f', b'o', b'e', b'Z',
             ],
-            Value::Map(map.clone()),
+            Value::Map(map.clone().into()),
         );
     }
 }
