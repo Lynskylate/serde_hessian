@@ -145,21 +145,146 @@ pub enum Value {
     Map(Map),
 }
 
-// TODO: Add more accessors
 impl Value {
+    /// Takes the value out of the `Value`, leaving a `Null` in its place.
+    pub fn take(&mut self) -> Self {
+        std::mem::replace(self, Value::Null)
+    }
+
+    /// If the `Value` is a `Null`, returns `()`. Returns `None` otherwise.
+    pub fn as_null(&self) -> Option<()> {
+        match self {
+            Value::Null => Some(()),
+            _ => None,
+        }
+    }
+
+    pub fn is_null(&self) -> bool {
+        self.as_null().is_some()
+    }
+
+    pub fn as_bool(&self) -> Option<bool> {
+        match *self {
+            Value::Bool(b) => Some(b),
+            _ => None,
+        }
+    }
+
+    pub fn is_bool(&self) -> bool {
+        self.as_bool().is_some()
+    }
+
     pub fn as_int(&self) -> Option<i32> {
-        if let Value::Int(i) = *self {
-            Some(i)
-        } else {
-            None
+        match *self {
+            Value::Int(i) => Some(i),
+            _ => None,
         }
     }
 
     pub fn is_int(&self) -> bool {
-        match self {
-            Value::Int(_) => true,
-            _ => false,
+        self.as_int().is_some()
+    }
+
+    pub fn as_long(&self) -> Option<i64> {
+        match *self {
+            Value::Long(l) => Some(l),
+            _ => None,
         }
+    }
+
+    pub fn is_long(&self) -> bool {
+        self.as_long().is_some()
+    }
+
+    pub fn as_double(&self) -> Option<f64> {
+        match *self {
+            Value::Double(f) => Some(f),
+            _ => None,
+        }
+    }
+
+    pub fn is_double(&self) -> bool {
+        self.as_double().is_some()
+    }
+
+    pub fn as_date(&self) -> Option<i64> {
+        match *self {
+            Value::Date(d) => Some(d),
+            _ => None,
+        }
+    }
+
+    pub fn is_date(&self) -> bool {
+        self.as_date().is_some()
+    }
+
+    pub fn as_bytes(&self) -> Option<&[u8]> {
+        match self {
+            Value::Bytes(bs) => Some(bs),
+            _ => None,
+        }
+    }
+
+    pub fn is_bytes(&self) -> bool {
+        self.as_bytes().is_some()
+    }
+
+    pub fn as_str(&self) -> Option<&str> {
+        match self {
+            Value::String(s) => Some(s),
+            _ => None,
+        }
+    }
+
+    pub fn is_str(&self) -> bool {
+        self.as_str().is_some()
+    }
+
+    pub fn as_ref(&self) -> Option<u32> {
+        match *self {
+            Value::Ref(r) => Some(r),
+            _ => None,
+        }
+    }
+
+    pub fn is_ref(&self) -> bool {
+        self.as_ref().is_some()
+    }
+
+    pub fn as_list(&self) -> Option<&List> {
+        match self {
+            Value::List(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn as_list_mut(&mut self) -> Option<&mut List> {
+        match self {
+            Value::List(l) => Some(l),
+            _ => None,
+        }
+    }
+
+    pub fn is_list(&self) -> bool {
+        self.as_int().is_some()
+    }
+
+    pub fn as_map(&self) -> Option<&HashMap<Value, Value>> {
+        match self {
+            Value::Map(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn as_map_mut(&mut self) -> Option<&mut HashMap<Value, Value>> {
+        match self {
+            Value::Map(m) => Some(m),
+            _ => None,
+        }
+    }
+
+    pub fn is_map(&self) -> bool {
+        self.as_map().is_some()
     }
 }
 
