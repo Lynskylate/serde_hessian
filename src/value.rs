@@ -7,6 +7,12 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Defintion {
+    pub name: String,
+    pub fields: Vec<String>,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum List {
     Typed(String, Vec<Value>),
@@ -67,13 +73,6 @@ impl DerefMut for List {
         self.value_mut()
     }
 }
-
-#[derive(Debug, Clone)]
-pub struct Defintion {
-    pub name: String,
-    pub fields: Vec<String>,
-}
-
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Map {
@@ -294,7 +293,6 @@ impl Value {
         self.as_map().is_some()
     }
 }
-
 
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Value) -> Option<Ordering> {

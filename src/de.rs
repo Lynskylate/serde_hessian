@@ -6,15 +6,13 @@ use byteorder::{BigEndian, ReadBytesExt};
 use super::constant::{Binary, ByteCodecType, Date, Integer, List, Long};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
-use super::value::{self, Value, Defintion};
+use super::value::{self, Defintion, Value};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
     type_references: Vec<String>,
     class_references: Vec<Defintion>,
 }
-
-
 
 impl<R: AsRef<[u8]>> Deserializer<R> {
     pub fn new(rd: R) -> Deserializer<R> {
@@ -88,9 +86,12 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     fn read_object(&mut self) -> Result<Value> {
         if let Value::Int(i) = self.read_value()? {
             // TODO(lynskylate@gmail.com): Avoid copy
-            let definition = self.class_references.get(i as usize)
-                .ok_or(SyntaxError(ErrorKind::OutofDefinitionRange(i as usize)))?.clone();
-            
+            let definition = self
+                .class_references
+                .get(i as usize)
+                .ok_or(SyntaxError(ErrorKind::OutofDefinitionRange(i as usize)))?
+                .clone();
+
             let fields_size = definition.fields.len();
             let mut map = HashMap::new();
             for i in 0..fields_size {
@@ -409,7 +410,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             ByteCodecType::Definition => {
                 self.read_definition()?;
                 self.read_value()
-            },
+            }
             ByteCodecType::Ref => self.read_ref(),
             ByteCodecType::Object => self.read_object(),
             _ => self.error(ErrorKind::UnknownType),
@@ -561,17 +562,22 @@ mod tests {
     #[test]
     fn test_read_object() {
         let mut map = HashMap::new();
-        map.insert(Value::String("Color".to_string()), Value::String("red".to_string()));
-        map.insert(Value::String("Model".to_string()), Value::String("corvette".to_string()));
+        map.insert(
+            Value::String("Color".to_string()),
+            Value::String("red".to_string()),
+        );
+        map.insert(
+            Value::String("Model".to_string()),
+            Value::String("corvette".to_string()),
+        );
         test_decode_ok(
             &[
-                b'C', 0x0b, b'e', b'x', b'a', b'm', b'p', b'l', b'e', b'.', b'C', b'a', b'r',
-                0x92, 0x05, b'C', b'o', b'l', b'o', b'r', 0x05, b'M', b'o', b'd', b'e', b'l',
-                b'O', 0x90, 0x03, b'r', b'e', b'd', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
+                b'C', 0x0b, b'e', b'x', b'a', b'm', b'p', b'l', b'e', b'.', b'C', b'a', b'r', 0x92,
+                0x05, b'C', b'o', b'l', b'o', b'r', 0x05, b'M', b'o', b'd', b'e', b'l', b'O', 0x90,
+                0x03, b'r', b'e', b'd', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
             ],
             Value::Map(map.clone().into()),
         );
-
     }
 
     #[test]
@@ -579,10 +585,12 @@ mod tests {
         let mut map = HashMap::new();
         map.insert(Value::String("head".to_string()), Value::Int(1));
         map.insert(Value::String("tail".to_string()), Value::Ref(0));
-        test_decode_ok(&[
-            b'C', 0x0a, b'L', b'i', b'n', b'k', b'e', b'd', b'L', b'i', b's', b't',
-            0x92, 0x04, b'h', b'e', b'a', b'd', 0x04, b't', b'a', b'i', b'l',
-            b'O', 0x90, 0x91, 0x51, 0x90
-        ], Value::Map(map.clone().into()));
+        test_decode_ok(
+            &[
+                b'C', 0x0a, b'L', b'i', b'n', b'k', b'e', b'd', b'L', b'i', b's', b't', 0x92, 0x04,
+                b'h', b'e', b'a', b'd', 0x04, b't', b'a', b'i', b'l', b'O', 0x90, 0x91, 0x51, 0x90,
+            ],
+            Value::Map(map.clone().into()),
+        );
     }
 }

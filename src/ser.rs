@@ -1,11 +1,10 @@
-use std::collections::HashMap;
 use std::io;
 
 use byteorder::{BigEndian, WriteBytesExt};
-use indexmap::{IndexSet, IndexMap};
+use indexmap::{IndexMap, IndexSet};
 
 use super::error::Result;
-use super::value::{self, Value, Defintion};
+use super::value::{self, Defintion, Value};
 
 pub struct Serializer<W> {
     writer: W,
@@ -91,9 +90,7 @@ impl<W: io::Write> Serializer<W> {
     // Write deinition if not exists in classes cache, and return ref num finally
     pub fn write_definition(&mut self, def: &Defintion) -> Result<usize> {
         match self.classes_cache.get_index_of(&def.name) {
-            Some(inx) => {
-               Ok(inx)
-            }
+            Some(inx) => Ok(inx),
             None => {
                 self.writer.write_u8(b'C')?;
                 self.serialize_string(def.name.as_str())?;
@@ -138,9 +135,16 @@ impl<W: io::Write> Serializer<W> {
         Ok(())
     }
 
-    fn serialize_map(&mut self, map: &HashMap<Value, Value>) -> Result<()> {
-        // TODO(lynskylate@gmail.com): handle typed map
-        self.writer.write_u8(b'H')?;
+    fn serialize_map(&mut self, map: &value::Map) -> Result<()> {
+        match map.r#type() {
+            Some(tp) => {
+                self.writer.write_u8(b'M')?;
+                self.write_type(tp)?;
+            }
+            None => {
+                self.writer.write_u8(b'H')?;
+            }
+        };
         for (k, v) in map.iter() {
             self.serialize_value(k)?;
             self.serialize_value(v)?;
@@ -325,8 +329,9 @@ impl<W: io::Write> Serializer<W> {
 #[cfg(test)]
 mod tests {
     use super::Serializer;
-    use crate::value::{self, Value};
     use crate::value::Value::Int;
+    use crate::value::{self, Value};
+    use std::collections::HashMap;
 
     fn test_encode_ok(value: Value, target: &[u8]) {
         let mut ser = Serializer::new(Vec::new());
@@ -432,7 +437,7 @@ mod tests {
     use crate::value::Defintion;
     #[test]
     fn test_encode_definiton() {
-        let def = Defintion{
+        let def = Defintion {
             name: "example.Car".to_string(),
             fields: vec!["color".to_string()],
         };
