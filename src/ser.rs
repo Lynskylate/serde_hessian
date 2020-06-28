@@ -12,7 +12,7 @@ pub struct Serializer<'a, W> {
     classes_cache: IndexMap<String, Defintion>,
 }
 
-pub trait IdentifyLast: Iterator + Sized {
+trait IdentifyLast: Iterator + Sized {
     fn identify_last(self) -> Iter<Self>;
 }
 
