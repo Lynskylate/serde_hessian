@@ -119,29 +119,35 @@ fn test_decode_map() {
     assert_eq!(
         load_value_from_file("tests/fixtures/map/car.bin").unwrap(),
         Value::Map(
-            hashmap! {
-                "a".into() => "a".into(),
-                "b".into() => "b".into(),
-                "c".into() => "c".into(),
-                "model".into() => "Beetle".into(),
-                "color".into() => "aquamarine".into(),
-                "mileage".into() => Value::Int(65536),
-            }
-            .into()
+            (
+                "hessian.demo.Car",
+                hashmap! {
+                    "a".into() => "a".into(),
+                    "b".into() => "b".into(),
+                    "c".into() => "c".into(),
+                    "model".into() => "Beetle".into(),
+                    "color".into() => "aquamarine".into(),
+                    "mileage".into() => Value::Int(65536),
+                }
+            )
+                .into()
         )
     );
 
     assert_eq!(
         load_value_from_file("tests/fixtures/map/car1.bin").unwrap(),
         Value::Map(
-            hashmap! {
-                "prev".into() => Value::Null,
-                "self".into() => Value::Ref(0),
-                "model".into() => "Beetle".into(),
-                "color".into() => "aquamarine".into(),
-                "mileage".into() => Value::Int(65536),
-            }
-            .into()
+            (
+                "hessian.demo.Car",
+                hashmap! {
+                    "prev".into() => Value::Null,
+                    "self".into() => Value::Ref(0),
+                    "model".into() => "Beetle".into(),
+                    "color".into() => "aquamarine".into(),
+                    "mileage".into() => Value::Int(65536),
+                }
+            )
+                .into()
         )
     );
 
@@ -206,4 +212,33 @@ fn test_decode_map() {
     let map = item0.as_map().unwrap();
     assert_eq!(map.r#type().unwrap(), "com.alibaba.fastjson.JSONObject");
     assert_eq!(map.len(), 3);
+}
+
+#[test]
+fn test_decode_object() {
+    let val = load_value_from_file("tests/fixtures/object/ConnectionRequest.bin").unwrap();
+    let map = val.as_map().unwrap();
+    assert_eq!(map.r#type().unwrap(), "hessian.ConnectionRequest");
+    let ctx = &map[&"ctx".into()].as_map().unwrap();
+    assert_eq!(
+        ctx.r#type().unwrap(),
+        "hessian.ConnectionRequest$RequestContext"
+    );
+    assert_eq!(ctx[&"id".into()], Value::Int(101));
+
+    let val = load_value_from_file("tests/fixtures/object/AtomicLong0.bin").unwrap();
+    let map = val.as_map().unwrap();
+    assert_eq!(
+        map.r#type().unwrap(),
+        "java.util.concurrent.atomic.AtomicLong"
+    );
+    assert_eq!(map[&"value".into()], Value::Long(0));
+
+    let val = load_value_from_file("tests/fixtures/object/AtomicLong1.bin").unwrap();
+    let map = val.as_map().unwrap();
+    assert_eq!(
+        map.r#type().unwrap(),
+        "java.util.concurrent.atomic.AtomicLong"
+    );
+    assert_eq!(map[&"value".into()], Value::Long(1));
 }

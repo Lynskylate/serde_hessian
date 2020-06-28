@@ -8,12 +8,12 @@ use super::constant::{
 };
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
-use super::value::{self, Defintion, Value};
+use super::value::{self, Definition, Value};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     buffer: Cursor<R>,
     type_references: Vec<String>,
-    class_references: Vec<Defintion>,
+    class_references: Vec<Definition>,
 }
 
 impl<R: AsRef<[u8]>> Deserializer<R> {
@@ -75,7 +75,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
         }
 
-        self.class_references.push(Defintion {
+        self.class_references.push(Definition {
             name: name,
             fields: fields,
         });
@@ -128,12 +128,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(ref_id)))?
             .clone();
 
+        let Definition { name, fields } = definition;
         let mut map = HashMap::new();
-        for k in definition.fields {
+        for k in fields {
             let v = self.read_value()?;
             map.insert(Value::String(k), v);
         }
-        Ok(Value::Map(map.clone().into()))
+        Ok(Value::Map((name, map.clone()).into()))
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -841,7 +842,7 @@ mod tests {
                 0x05, b'C', b'o', b'l', b'o', b'r', 0x05, b'M', b'o', b'd', b'e', b'l', b'O', 0x90,
                 0x03, b'r', b'e', b'd', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
             ],
-            Value::Map(map.clone().into()),
+            Value::Map(("example.Car", map).into()),
         );
     }
 
@@ -855,7 +856,7 @@ mod tests {
                 b'C', 0x0a, b'L', b'i', b'n', b'k', b'e', b'd', b'L', b'i', b's', b't', 0x92, 0x04,
                 b'h', b'e', b'a', b'd', 0x04, b't', b'a', b'i', b'l', b'O', 0x90, 0x91, 0x51, 0x90,
             ],
-            Value::Map(map.clone().into()),
+            Value::Map(("LinkedList", map).into()),
         );
     }
 }

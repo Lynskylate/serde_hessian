@@ -9,7 +9,7 @@ use std::ops::{Deref, DerefMut};
 
 /// class definition
 #[derive(Debug, Clone, PartialEq, Eq)]
-pub struct Defintion {
+pub struct Definition {
     pub name: String,
     pub fields: Vec<String>,
 }

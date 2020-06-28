@@ -4,12 +4,12 @@ use byteorder::{BigEndian, WriteBytesExt};
 use indexmap::{IndexMap, IndexSet};
 
 use super::error::Result;
-use super::value::{self, Defintion, Value};
+use super::value::{self, Definition, Value};
 
 pub struct Serializer<'a, W> {
     writer: &'a mut W,
     type_cache: IndexSet<String>,
-    classes_cache: IndexMap<String, Defintion>,
+    classes_cache: IndexMap<String, Definition>,
 }
 
 trait IdentifyLast: Iterator + Sized {
@@ -84,7 +84,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
 
     // class-def  ::= 'C' string int string*
     // Write deinition if not exists in classes cache, and return ref num finally
-    pub fn write_definition(&mut self, def: &Defintion) -> Result<usize> {
+    pub fn write_definition(&mut self, def: &Definition) -> Result<usize> {
         match self.classes_cache.get_index_of(&def.name) {
             Some(inx) => Ok(inx),
             None => {
@@ -438,9 +438,9 @@ mod tests {
 
     #[test]
     fn test_encode_definiton() {
-        use crate::value::Defintion;
+        use crate::value::Definition;
 
-        let def = Defintion {
+        let def = Definition {
             name: "example.Car".to_string(),
             fields: vec!["color".to_string()],
         };
