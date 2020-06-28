@@ -65,10 +65,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             match self.read_value() {
                 Ok(Value::String(s)) => fields.push(s),
                 Ok(v) => {
-                    return self.error(ErrorKind::UnExpectError(format!(
-                        "Expect get string, but get {}",
-                        &v
-                    )))
+                    return self.error(ErrorKind::UnexpectedType(v.to_string()));
                 }
                 _ => {
                     return self.error(ErrorKind::UnknownType);
@@ -84,12 +81,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     fn read_object(&mut self) -> Result<Value> {
-        if let Value::Int(i) = self.read_value()? {
+        let val = self.read_value()?;
+        if let Value::Int(i) = val {
             // TODO(lynskylate@gmail.com): Avoid copy
             let definition = self
                 .class_references
                 .get(i as usize)
-                .ok_or(SyntaxError(ErrorKind::OutofDefinitionRange(i as usize)))?
+                .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(i as usize)))?
                 .clone();
 
             let fields_size = definition.fields.len();
@@ -101,7 +99,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
             Ok(Value::Map(map.clone().into()))
         } else {
-            self.error(ErrorKind::MisMatchType)
+            self.error(ErrorKind::UnexpectedType(val.to_string()))
         }
     }
 
@@ -287,10 +285,10 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 if let Some(res) = self.type_references.iter().nth(i as usize) {
                     Ok(res.clone())
                 } else {
-                    self.error(ErrorKind::OutofTypeRefRange(i as usize))
+                    self.error(ErrorKind::OutOfTypeRefRange(i as usize))
                 }
             }
-            Ok(_) => self.error(ErrorKind::MisMatchType),
+            Ok(v) => self.error(ErrorKind::UnexpectedType(v.to_string())),
             Err(e) => Err(e),
         }
     }
@@ -355,18 +353,18 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             List::FixedLengthList(typed) => {
                 let list = if typed {
                     let typ = self.read_type()?;
-                    let length = self
-                        .read_value()?
-                        .as_int()
-                        .ok_or_else(|| SyntaxError(ErrorKind::MisMatchType))?;
-                    let val = self.read_exact_length_list_internal(length as usize)?;
+                    let length = match self.read_value()? {
+                        Value::Int(l) => l as usize,
+                        v @ _ => return self.error(ErrorKind::UnexpectedType(v.to_string())),
+                    };
+                    let val = self.read_exact_length_list_internal(length)?;
                     value::List::from((typ, val))
                 } else {
-                    let length = self
-                        .read_value()?
-                        .as_int()
-                        .ok_or_else(|| SyntaxError(ErrorKind::MisMatchType))?;
-                    let val = self.read_exact_length_list_internal(length as usize)?;
+                    let length = match self.read_value()? {
+                        Value::Int(l) => l as usize,
+                        v @ _ => return self.error(ErrorKind::UnexpectedType(v.to_string())),
+                    };
+                    let val = self.read_exact_length_list_internal(length)?;
                     value::List::from(val)
                 };
                 Ok(Value::List(list))
@@ -385,11 +383,9 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     fn read_ref(&mut self) -> Result<Value> {
-        println!("ref ref");
-        if let Value::Int(i) = self.read_value()? {
-            Ok(Value::Ref(i as u32))
-        } else {
-            self.error(ErrorKind::MisMatchType)
+        match self.read_value()? {
+            Value::Int(i) => Ok(Value::Ref(i as u32)),
+            v @ _ => self.error(ErrorKind::UnexpectedType(v.to_string())),
         }
     }
 
@@ -418,7 +414,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 }
 
-pub fn value_from_slice(v: &[u8]) -> Result<Value> {
+pub fn from_slice(v: &[u8]) -> Result<Value> {
     let mut de = Deserializer::new(v);
     let value = de.read_value()?;
     Ok(value)
