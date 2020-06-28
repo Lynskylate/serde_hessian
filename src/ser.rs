@@ -60,7 +60,7 @@ where
 impl<W: io::Write> Serializer<W> {
     pub fn new(writer: W) -> Self {
         Serializer {
-            writer: writer,
+            writer,
             type_cache: IndexSet::new(),
             classes_cache: IndexMap::new(),
         }
@@ -202,7 +202,7 @@ impl<W: io::Write> Serializer<W> {
                 (v >> 8 & 0xff) as u8,
                 (v & 0xff) as u8,
             ],
-            _ => Vec::from([&[b'L'], v.to_be_bytes().as_ref()].concat()),
+            _ => [&[b'L'], v.to_be_bytes().as_ref()].concat(),
         };
         self.writer.write_all(&bytes)?;
         Ok(())
@@ -232,7 +232,7 @@ impl<W: io::Write> Serializer<W> {
 
     fn serialize_double(&mut self, v: f64) -> Result<()> {
         let int_v = v.trunc() as i32;
-        if int_v as f64 == v {
+        if (int_v as f64 - v).abs() < f64::EPSILON {
             match int_v {
                 0 => self.writer.write_u8(0x5b)?,
                 1 => self.writer.write_u8(0x5c)?,
@@ -248,7 +248,7 @@ impl<W: io::Write> Serializer<W> {
             }
         } else {
             let mills = v * 1000.0;
-            if mills * 0.001 == v {
+            if (mills * 0.001 - v).abs() < f64::EPSILON {
                 self.writer.write_u8(0x5f)?;
                 self.writer.write_i32::<BigEndian>(mills as i32)?;
             } else {
@@ -261,7 +261,7 @@ impl<W: io::Write> Serializer<W> {
 
     fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
         if v.len() < 16 {
-            self.writer.write(&[(v.len() - 0x20) as u8])?;
+            self.writer.write_all(&[(v.len() - 0x20) as u8])?;
             self.writer.write_all(&v)?;
         } else {
             for (last, chunk) in v.chunks(0xffff).identify_last() {

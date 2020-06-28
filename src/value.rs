@@ -135,7 +135,7 @@ impl DerefMut for Map {
     }
 }
 
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug)]
 pub enum Value {
     Null,
     // ClassDef,
@@ -149,6 +149,31 @@ pub enum Value {
     Ref(u32),
     List(List),
     Map(Map),
+}
+
+impl PartialEq for Value {
+    fn eq(&self, other: &Value) -> bool {
+        match (self, other) {
+            (Value::Null, Value::Null) => true,
+            (Value::Bool(lhs), Value::Bool(rhs)) => lhs == rhs,
+            (Value::Int(lhs), Value::Int(rhs)) => lhs == rhs,
+            (Value::Long(lhs), Value::Long(rhs)) => lhs == rhs,
+            (Value::Double(lhs), Value::Double(rhs)) => lhs == rhs,
+            (Value::Date(lhs), Value::Date(rhs)) => lhs == rhs,
+            (Value::Bytes(lhs), Value::Bytes(rhs)) => lhs == rhs,
+            (Value::String(lhs), Value::String(rhs)) => lhs == rhs,
+            (Value::Ref(lhs), Value::Ref(rhs)) => lhs == rhs,
+            (Value::List(lhs), Value::List(rhs)) => lhs == rhs,
+            (Value::Map(lhs), Value::Map(rhs)) => {
+                let mut left_v: Vec<_> = lhs.iter().collect();
+                let mut right_v: Vec<_> = rhs.iter().collect();
+                left_v.sort_by(|l_iter, r_iter| l_iter.0.cmp(r_iter.0));
+                right_v.sort_by(|l_iter, r_iter| l_iter.0.cmp(r_iter.0));
+                left_v == right_v
+            }
+            _ => false,
+        }
+    }
 }
 
 impl Value {

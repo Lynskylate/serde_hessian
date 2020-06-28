@@ -76,10 +76,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
         }
 
-        self.class_references.push(Defintion {
-            name: name,
-            fields: fields,
-        });
+        self.class_references.push(Defintion { name, fields });
         Ok(())
     }
 
@@ -99,7 +96,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 let v = self.read_value()?;
                 map.insert(Value::String(k), v);
             }
-            Ok(Value::Map(map.clone().into()))
+            Ok(Value::Map(map.into()))
         } else {
             self.error(ErrorKind::MisMatchType)
         }
@@ -235,7 +232,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 }
                 _ => {}
             }
-            len = len - 1;
+            len -= 1
         }
         Ok(s)
     }
@@ -246,7 +243,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         match tag {
             // ::= [x00-x1f] <utf8-data>         # string of length 0-31
             0x00..=0x1f => {
-                let len = tag as usize - 0x00;
+                let len = tag as usize;
                 buf.extend_from_slice(&self.read_utf8_string(len)?);
             }
             // ::= [x30-x34] <utf8-data>         # string of length 0-1023
@@ -284,7 +281,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 Ok(s)
             }
             Ok(Value::Int(i)) => {
-                if let Some(res) = self.type_references.iter().nth(i as usize) {
+                if let Some(res) = self.type_references.get(i as usize) {
                     Ok(res.clone())
                 } else {
                     self.error(ErrorKind::OutofTypeRefRange(i as usize))
