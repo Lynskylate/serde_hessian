@@ -484,9 +484,10 @@ impl<'a> ToHessian for &'a Vec<u8> {
     }
 }
 
-impl<T> ToHessian for HashMap<T, T>
+impl<K, V> ToHessian for HashMap<K, V>
 where
-    T: ToHessian,
+    K: ToHessian,
+    V: ToHessian,
 {
     fn to_hessian(self) -> Value {
         let kv: HashMap<Value, Value> = self
@@ -497,9 +498,10 @@ where
     }
 }
 
-impl<T> ToHessian for (String, HashMap<T, T>)
+impl<K, V> ToHessian for (String, HashMap<K, V>)
 where
-    T: ToHessian,
+    K: ToHessian,
+    V: ToHessian,
 {
     fn to_hessian(self) -> Value {
         let (typ, kv) = self;
@@ -511,9 +513,10 @@ where
     }
 }
 
-impl<T> ToHessian for (&str, HashMap<T, T>)
+impl<K, V> ToHessian for (&str, HashMap<K, V>)
 where
-    T: ToHessian,
+    K: ToHessian,
+    V: ToHessian,
 {
     fn to_hessian(self) -> Value {
         let (typ, kv) = self;
