@@ -53,3 +53,61 @@ fn test_decode_string() {
         Value::String("中文 Chinese".to_string())
     );
 }
+
+#[test]
+fn test_decode_list() {
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/untyped_list.bin").unwrap(),
+        Value::List(vec![Value::Int(1), Value::Int(2), "foo".into()].into())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/untyped_[].bin").unwrap(),
+        Value::List(vec![].into())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/untyped_list_8.bin").unwrap(),
+        Value::List(
+            vec!["1", "2", "3", "4", "5", "6", "7", "8"]
+                .into_iter()
+                .map(|x| x.into())
+                .collect::<Vec<Value>>()
+                .into()
+        )
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/untyped_<String>[foo,bar].bin").unwrap(),
+        Value::List(vec!["foo".into(), "bar".into()].into())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/[int.bin").unwrap(),
+        Value::List(("[int", vec![Value::Int(1), Value::Int(2), Value::Int(3)]).into())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/[string.bin").unwrap(),
+        Value::List(("[string", vec!["1".into(), "@".into(), "3".into()]).into())
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/typed_list.bin").unwrap(),
+        Value::List(
+            (
+                "hessian.demo.SomeArrayList",
+                vec!["ok".into(), "some list".into()]
+            )
+                .into()
+        )
+    );
+    assert_eq!(
+        load_value_from_file("tests/fixtures/list/typed_list_8.bin").unwrap(),
+        Value::List(
+            (
+                "hessian.demo.SomeArrayList",
+                vec!["1", "2", "3", "4", "5", "6", "7", "8"]
+                    .into_iter()
+                    .map(|x| x.into())
+                    .collect::<Vec<Value>>()
+                    .into()
+            )
+                .into()
+        )
+    );
+}

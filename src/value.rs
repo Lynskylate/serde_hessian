@@ -484,6 +484,12 @@ impl<'a> ToHessian for &'a Vec<u8> {
     }
 }
 
+impl<T: ToHessian> From<T> for Value {
+    fn from(val: T) -> Self {
+        val.to_hessian()
+    }
+}
+
 impl fmt::Display for Value {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         match *self {
