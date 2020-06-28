@@ -83,7 +83,8 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// Read an object from buffer
     ///
     /// v2.0
-    /// ```
+    ///
+    /// ```ignore
     /// class-def  ::= 'C(x43)' string int string*
     ///
     /// object     ::= 'O(x4f)' int value*
@@ -162,7 +163,8 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read bytes from buffer
     ///
     /// v2.0
-    /// ```
+    ///
+    /// ```ignore
     /// binary ::= x41(A) b1 b0 <binary-data> binary
     ///        ::= x42(B) b1 b0 <binary-data>
     ///        ::= [x20-x2f] <binary-data>
@@ -195,7 +197,8 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read a int from buffer
     ///
     /// v2.0
-    /// ```
+    ///
+    /// ```ignore
     /// int ::= I(x49) b3 b2 b1 b0
     ///     ::= [x80-xbf]
     ///     ::= [xc0-xcf] b0
@@ -206,25 +209,25 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     /// A 32-bit signed integer. An integer is represented by the octet x49 ('I')
     /// followed by the 4 octets of the integer in big-endian order.
-    /// ```
+    /// ```ignore
     /// value = (b3 << 24) + (b2 << 16) + (b1 << 8) + b0;
     /// ```
     ///
     /// single octet integers:
     /// Integers between -16 and 47 can be encoded by a single octet in the range x80 to xbf.
-    /// ```
+    /// ```ignore
     /// value = code - 0x90
     /// ```
     ///
     /// two octet integers:
     /// Integers between -2048 and 2047 can be encoded in two octets with the leading byte in the range xc0 to xcf.
-    /// ```
+    /// ```ignore
     /// value = ((code - 0xc8) << 8) + b0;
     /// ```
     ///
     /// three octet integers:
     /// Integers between -262144 and 262143 can be encoded in three bytes with the leading byte in the range xd0 to xd7.
-    /// ```
+    /// ```ignore
     /// value = ((code - 0xd4) << 16) + (b1 << 8) + b0;
     /// ```
     ///
@@ -254,7 +257,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read a long from buffer
     ///
     /// v2.0
-    /// ```
+    /// ```ignore
     /// long ::= L(x4c) b7 b6 b5 b4 b3 b2 b1 b0
     ///      ::= [xd8-xef]
     ///      ::= [xf0-xff] b0
@@ -269,25 +272,25 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     /// single octet longs:
     /// Longs between -8 and 15 are represented by a single octet in the range xd8 to xef.
-    /// ```
+    /// ```ignore
     /// value = (code - 0xe0)
     /// ```
     ///
     /// two octet longs:
     /// Longs between -2048 and 2047 are encoded in two octets with the leading byte in the range xf0 to xff.
-    /// ```
+    /// ```ignore
     /// value = ((code - 0xf8) << 8) + b0
     /// ```
     ///
     /// three octet longs:
     /// Longs between -262144 and 262143 are encoded in three octets with the leading byte in the range x38 to x3f.
-    /// ```
+    /// ```ignore
     /// value = ((code - 0x3c) << 16) + (b1 << 8) + b0
     /// ```
     ///
     /// four octet longs:
     /// Longs between which fit into 32-bits are encoded in five octets with the leading byte x59.
-    /// ```
+    /// ```ignore
     /// value = (b3 << 24) + (b2 << 16) + (b1 << 8) + b0
     /// ```
     ///
@@ -315,7 +318,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read a double from buffer
     ///
     /// v2.0
-    /// ```
+    /// ```ignore
     /// double ::= D(x44) b7 b6 b5 b4 b3 b2 b1 b0
     ///        ::= x5b
     ///        ::= x5c
@@ -332,14 +335,14 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// double octet:
     /// Doubles between -128.0 and 127.0 with no fractional component
     /// can be represented in two octets by casting the byte value to a double.
-    /// ```
+    /// ```ignore
     /// value = (double) b0
     /// ```
     ///
     /// double short:
     /// Doubles between -32768.0 (-0x8000) and 32767.0(0x8000 - 1) with no fractional component
     /// can be represented in three octets by casting the short value to a double.
-    /// ```
+    /// ```ignore
     /// value = (double) (256/// b1 + b0)
     /// ```
     ///
@@ -363,7 +366,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read a date from buffer,
     ///
     /// v2.0
-    /// ```
+    /// ```ignore
     /// date ::= x4a(J) b7 b6 b5 b4 b3 b2 b1 b0 // Date represented by a 64-bit long of milliseconds since Jan 1 1970 00:00H, UTC.
     ///      ::= x4b(K) b4 b3 b2 b1 b0          // The second form contains a 32-bit int of minutes since Jan 1 1970 00:00H, UTC.
     /// ```
@@ -444,7 +447,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// The length is the number of characters, which may be different than the number of bytes.
     ///
     /// v2.0
-    /// ```
+    /// ```ignore
     /// string ::= R(x52) b1 b0 <utf8-data> string  # non-final chunk
     ///        ::= S(x53) b1 b0 <utf8-data>         # string of length 0-65535
     ///        ::= [x00-x1f] <utf8-data>            # string of length 0-31
@@ -462,7 +465,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     /// short strings:
     /// Strings with length less than 32 may be encoded with a single octet length [x00-x1f].
-    /// ```
+    /// ```ignore
     /// [x00-x1f] <utf8-data>
     /// ```
     ///
@@ -473,7 +476,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     /// v2.0
-    /// ```
+    /// ```ignore
     /// ref ::= (0x51) int(putInt)
     /// ```
     ///
@@ -532,7 +535,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read an array from buffer
     ///
     /// v2.0
-    /// ```
+    /// ```ignore
     /// list ::= x55 type value* 'Z'   # variable-length list
     ///      ::= 'V(x56)' type int value*   # fixed-length list
     ///      ::= x57 value* 'Z'        # variable-length untyped list
@@ -604,7 +607,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// read an map from buffer
     ///
     /// v2.0
-    /// ```
+    /// ```ignore
     /// map        ::= 'M' type (value value)* 'Z'  # key, value map pairs
     ///            ::= 'H' (value value)* 'Z'       # untyped key, value
     /// ```
@@ -633,7 +636,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     /// v2.0
-    /// ```
+    /// ```ignore
     /// ref ::= Q(x51) int
     /// ```
     ///
