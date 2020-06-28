@@ -4,15 +4,15 @@ use byteorder::{BigEndian, WriteBytesExt};
 use indexmap::{IndexMap, IndexSet};
 
 use super::error::Result;
-use super::value::{self, Defintion, Value};
+use super::value::{self, Definition, Value};
 
-pub struct Serializer<W> {
-    writer: W,
+pub struct Serializer<'a, W> {
+    writer: &'a mut W,
     type_cache: IndexSet<String>,
-    classes_cache: IndexMap<String, Defintion>,
+    classes_cache: IndexMap<String, Definition>,
 }
 
-pub trait IdentifyLast: Iterator + Sized {
+trait IdentifyLast: Iterator + Sized {
     fn identify_last(self) -> Iter<Self>;
 }
 
@@ -57,17 +57,13 @@ where
     }
 }
 
-impl<W: io::Write> Serializer<W> {
-    pub fn new(writer: W) -> Self {
+impl<'a, W: io::Write> Serializer<'a, W> {
+    pub fn new(writer: &'a mut W) -> Self {
         Serializer {
             writer,
             type_cache: IndexSet::new(),
             classes_cache: IndexMap::new(),
         }
-    }
-
-    pub fn into_inner(self) -> W {
-        self.writer
     }
 
     pub fn serialize_value(&mut self, value: &Value) -> Result<()> {
@@ -88,7 +84,7 @@ impl<W: io::Write> Serializer<W> {
 
     // class-def  ::= 'C' string int string*
     // Write deinition if not exists in classes cache, and return ref num finally
-    pub fn write_definition(&mut self, def: &Defintion) -> Result<usize> {
+    pub fn write_definition(&mut self, def: &Definition) -> Result<usize> {
         match self.classes_cache.get_index_of(&def.name) {
             Some(inx) => Ok(inx),
             None => {
@@ -326,17 +322,22 @@ impl<W: io::Write> Serializer<W> {
     }
 }
 
+/// Serialize a `Value` to bytes
+pub fn to_vec(value: &Value) -> Result<Vec<u8>> {
+    let mut buf = Vec::new();
+    let mut ser = Serializer::new(&mut buf);
+    ser.serialize_value(&value)?;
+    Ok(buf)
+}
+
 #[cfg(test)]
 mod tests {
-    use super::Serializer;
+    use super::{to_vec, Serializer};
     use crate::value::Value::Int;
     use crate::value::{self, Value};
-    use std::collections::HashMap;
 
     fn test_encode_ok(value: Value, target: &[u8]) {
-        let mut ser = Serializer::new(Vec::new());
-        assert!(ser.serialize_value(&value).is_ok());
-        assert_eq!(ser.writer.to_vec(), target, "{:?} encode error", value);
+        assert_eq!(to_vec(&value).unwrap(), target, "{:?} encode error", value);
     }
 
     #[test]
@@ -424,7 +425,8 @@ mod tests {
 
     #[test]
     fn test_encode_type() {
-        let mut ser = Serializer::new(Vec::new());
+        let mut buf = Vec::new();
+        let mut ser = Serializer::new(&mut buf);
         let first_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
         ser.serialize_list(&first_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
@@ -434,14 +436,16 @@ mod tests {
         assert_eq!(ser.type_cache.len(), 1);
     }
 
-    use crate::value::Defintion;
     #[test]
     fn test_encode_definiton() {
-        let def = Defintion {
+        use crate::value::Definition;
+
+        let def = Definition {
             name: "example.Car".to_string(),
             fields: vec!["color".to_string()],
         };
-        let mut ser = Serializer::new(Vec::new());
+        let mut buf = Vec::new();
+        let mut ser = Serializer::new(&mut buf);
         assert!(ser.write_definition(&def).unwrap() == 0);
         assert!(ser.write_definition(&def).unwrap() == 0);
     }

@@ -3,7 +3,6 @@ use std::collections::HashMap;
 use hessian_rs::{
     de::Deserializer,
     ser::Serializer,
-    value,
     Value::{self, *},
 };
 
