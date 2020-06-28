@@ -112,17 +112,14 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     fn read_object(&mut self) -> Result<Value> {
         let val = self.read_value()?;
         if let Value::Int(i) = val {
-            // TODO(lynskylate@gmail.com): Avoid copy
             let definition = self
                 .class_references
                 .get(i as usize)
                 .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(i as usize)))?
                 .clone();
 
-            let fields_size = definition.fields.len();
             let mut map = HashMap::new();
-            for i in 0..fields_size {
-                let k = definition.fields[i].clone();
+            for k in definition.fields {
                 let v = self.read_value()?;
                 map.insert(Value::String(k), v);
             }
