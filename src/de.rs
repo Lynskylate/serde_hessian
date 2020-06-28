@@ -44,6 +44,14 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     #[inline]
+    fn read_bytes_into(&mut self, buf: &mut Vec<u8>, n: usize) -> Result<()> {
+        match self.buffer.by_ref().take(n as u64).read_to_end(buf)? {
+            m if m == n => Ok(()),
+            _ => Err(io::Error::new(io::ErrorKind::UnexpectedEof, "Unexpected EOF").into()),
+        }
+    }
+
+    #[inline]
     fn peek_byte(&mut self) -> Result<u8> {
         let tag = self.buffer.read_u8()?;
         self.buffer.seek(SeekFrom::Current(-1))?;
@@ -143,7 +151,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         // Get non-final chunk starts with 'A'
         while tag == 0x41 {
             let length = self.buffer.read_i16::<BigEndian>()? as usize;
-            buf.extend_from_slice(&self.read_bytes(length)?);
+            self.read_bytes_into(&mut buf, length)?;
             tag = self.read_byte()?;
         }
 
@@ -152,13 +160,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             b'B' => {
                 // Get the last chunk starts with 'B'
                 let length = self.buffer.read_i16::<BigEndian>()? as usize;
-                buf.extend_from_slice(&self.read_bytes(length)?);
+                self.read_bytes_into(&mut buf, length)?;
             }
-            0x20..=0x2f => buf.extend_from_slice(&self.read_bytes((tag - 0x20) as usize)?),
+            0x20..=0x2f => self.read_bytes_into(&mut buf, (tag - 0x20) as usize)?,
             0x34..=0x37 => {
                 let second_byte = self.read_byte()?;
-                let v = self.read_bytes(i16::from_be_bytes([tag - 0x34, second_byte]) as usize)?;
-                buf.extend_from_slice(&v);
+                let length = i16::from_be_bytes([tag - 0x34, second_byte]) as usize;
+                self.read_bytes_into(&mut buf, length)?;
             }
             _ => { /* TODO: error */ }
         }
@@ -384,8 +392,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::Date(val))
     }
 
-    fn read_utf8_string(&mut self, len: usize) -> Result<Vec<u8>> {
-        let mut s = Vec::new();
+    fn read_utf8_string(&mut self, s: &mut Vec<u8>, len: usize) -> Result<()> {
         let mut len = len;
         while len > 0 {
             let byte = self.read_byte()?;
@@ -411,28 +418,26 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
             len = len - 1;
         }
-        Ok(s)
+        Ok(())
     }
 
-    fn read_string_internal(&mut self, tag: StringType) -> Result<Vec<u8>> {
-        // TODO: remove unnecessary copying
-        let mut buf = Vec::new();
+    fn read_string_internal(&mut self, buf: &mut Vec<u8>, tag: StringType) -> Result<()> {
         match tag {
             StringType::Compact(b) => {
                 let len = b as usize - 0x00;
-                buf.extend_from_slice(&self.read_utf8_string(len)?);
+                self.read_utf8_string(buf, len)?;
             }
             StringType::Small(b) => {
                 let len = (b as usize - 0x30) * 256 + self.read_byte()? as usize;
-                buf.extend_from_slice(&self.read_utf8_string(len)?);
+                self.read_utf8_string(buf, len)?;
             }
             StringType::Chunk => {
                 let len = self.buffer.read_u16::<BigEndian>()? as usize;
-                buf.extend_from_slice(&self.read_utf8_string(len)?);
+                self.read_utf8_string(buf, len)?;
                 let next_tag = ByteCodecType::from(self.read_byte()?);
                 match next_tag {
                     ByteCodecType::String(s) => {
-                        buf.extend_from_slice(&self.read_string_internal(s)?);
+                        self.read_string_internal(buf, s)?;
                     }
                     _ => {
                         return self.error(ErrorKind::UnexpectedType(next_tag.to_string()));
@@ -441,10 +446,10 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
             StringType::FinalChunk => {
                 let len = self.buffer.read_u16::<BigEndian>()? as usize;
-                buf.extend_from_slice(&self.read_utf8_string(len)?);
+                self.read_utf8_string(buf, len)?;
             }
         }
-        Ok(buf)
+        Ok(())
     }
 
     /// read a string from buffer
@@ -475,7 +480,8 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// ```
     ///
     fn read_string(&mut self, tag: StringType) -> Result<Value> {
-        let buf = self.read_string_internal(tag)?;
+        let mut buf = Vec::new();
+        self.read_string_internal(&mut buf, tag)?;
         let s = String::from_utf8(buf)?;
         Ok(Value::String(s))
     }
