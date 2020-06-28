@@ -1,5 +1,5 @@
-use crate::error::Error::IoError;
 use std::result;
+use std::string::FromUtf8Error;
 use std::{fmt, io};
 
 #[derive(Clone, PartialEq, Debug)]
@@ -27,6 +27,7 @@ impl fmt::Display for ErrorKind {
 pub enum Error {
     SyntaxError(ErrorKind),
     IoError(io::Error),
+    FromUtf8Error(FromUtf8Error),
 }
 
 impl fmt::Display for Error {
@@ -34,13 +35,20 @@ impl fmt::Display for Error {
         match self {
             Error::SyntaxError(err) => write!(f, "syntax error: {}", err),
             Error::IoError(err) => err.fmt(f),
+            Error::FromUtf8Error(err) => err.fmt(f),
         }
     }
 }
 
 impl From<io::Error> for Error {
     fn from(error: io::Error) -> Error {
-        IoError(error)
+        Error::IoError(error)
+    }
+}
+
+impl From<FromUtf8Error> for Error {
+    fn from(error: FromUtf8Error) -> Self {
+        Error::FromUtf8Error(error)
     }
 }
 

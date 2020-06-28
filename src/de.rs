@@ -475,7 +475,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     fn read_string(&mut self, tag: StringType) -> Result<Value> {
         let buf = self.read_string_internal(tag)?;
-        let s = unsafe { String::from_utf8_unchecked(buf) };
+        let s = String::from_utf8(buf)?;
         Ok(Value::String(s))
     }
 
