@@ -181,13 +181,13 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     fn read_binary(&mut self, bin: Binary) -> Result<Value> {
         match bin {
-            Binary::ShortBinary(b) => Ok(Value::Bytes(self.read_bytes((b - 0x20) as usize)?)),
-            Binary::TwoOctetBinary(b) => {
+            Binary::Short(b) => Ok(Value::Bytes(self.read_bytes((b - 0x20) as usize)?)),
+            Binary::TwoOctet(b) => {
                 let second_byte = self.read_byte()?;
                 let v = self.read_bytes(i16::from_be_bytes([b - 0x34, second_byte]) as usize)?;
                 Ok(Value::Bytes(v))
             }
-            Binary::LongBinary(b) => self.read_long_binary(b),
+            Binary::Long(b) => self.read_long_binary(b),
         }
     }
 
@@ -230,20 +230,20 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     fn read_int(&mut self, i: Integer) -> Result<Value> {
         match i {
-            Integer::DirectInt(b) => Ok(Value::Int(b as i32 - 0x90)),
-            Integer::ByteInt(b) => {
+            Integer::Direct(b) => Ok(Value::Int(b as i32 - 0x90)),
+            Integer::Byte(b) => {
                 let b2 = self.read_byte()?;
                 Ok(Value::Int(
                     i16::from_be_bytes([b.overflowing_sub(0xc8).0, b2]) as i32,
                 ))
             }
-            Integer::ShortInt(b) => {
+            Integer::Short(b) => {
                 let bs = self.read_bytes(2)?;
                 Ok(Value::Int(
                     i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
                 ))
             }
-            Integer::NormalInt => {
+            Integer::Normal => {
                 let val = self.buffer.read_i32::<BigEndian>()?;
                 Ok(Value::Int(val))
             }
@@ -292,22 +292,22 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     fn read_long(&mut self, l: Long) -> Result<Value> {
         match l {
-            Long::DirectLong(b) => Ok(Value::Long(b as i64 - 0xe0)),
-            Long::ByteLong(b) => {
+            Long::Direct(b) => Ok(Value::Long(b as i64 - 0xe0)),
+            Long::Byte(b) => {
                 let b2 = self.read_byte()?;
                 Ok(Value::Long(
                     i16::from_be_bytes([b.overflowing_sub(0xf8).0, b2]) as i64,
                 ))
             }
-            Long::ShortLong(b) => {
+            Long::Short(b) => {
                 let bs = self.read_bytes(2)?;
                 Ok(Value::Long(
                     (i32::from_be_bytes([b.overflowing_sub(0x3c).0, bs[0], bs[1], 0x00]) >> 8)
                         as i64,
                 ))
             }
-            Long::Int32Long => Ok(Value::Long(self.buffer.read_i32::<BigEndian>()? as i64)),
-            Long::NormalLong => Ok(Value::Long(self.buffer.read_i64::<BigEndian>()?)),
+            Long::Int32 => Ok(Value::Long(self.buffer.read_i32::<BigEndian>()? as i64)),
+            Long::Normal => Ok(Value::Long(self.buffer.read_i64::<BigEndian>()?)),
         }
     }
 
@@ -555,7 +555,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     fn read_list(&mut self, list: List) -> Result<Value> {
         // TODO(lynskylate@gmail.com): Should add list to reference, but i don't know any good way to deal with it
         match list {
-            List::ShortFixedLengthList(typed, length) => {
+            List::ShortFixedLength(typed, length) => {
                 let list = if typed {
                     let typ = self.read_type()?;
                     let val = self.read_exact_length_list_internal(length)?;
@@ -566,7 +566,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 };
                 Ok(Value::List(list))
             }
-            List::VarLengthList(typed) => {
+            List::VarLength(typed) => {
                 let list = if typed {
                     let typ = self.read_type()?;
                     let val = self.read_varlength_list_internal()?;
@@ -577,7 +577,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 };
                 Ok(Value::List(list))
             }
-            List::FixedLengthList(typed) => {
+            List::FixedLength(typed) => {
                 let list = if typed {
                     let typ = self.read_type()?;
                     let length = match self.read_value()? {
