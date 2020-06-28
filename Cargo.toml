@@ -1,6 +1,6 @@
 [package]
 name = "hessian_rs"
-version = "0.0.1"
+version = "0.0.2"
 authors = ["lynskylate <lynskylate@gmail.com>"]
 edition = "2018"
 keywords = ["serialization", "hessian2", "serde"]
