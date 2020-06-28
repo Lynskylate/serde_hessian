@@ -533,7 +533,7 @@ where
             .into_iter()
             .map(|(k, v)| (k.to_hessian(), v.to_hessian()))
             .collect();
-        Value::Map((typ, kv.into()).into())
+        Value::Map((typ, kv).into())
     }
 }
 
@@ -548,7 +548,7 @@ where
             .into_iter()
             .map(|(k, v)| (k.to_hessian(), v.to_hessian()))
             .collect();
-        Value::Map((typ, kv.into()).into())
+        Value::Map((typ, kv).into())
     }
 }
 
@@ -586,7 +586,7 @@ impl fmt::Display for Value {
                 }
                 write!(f, "}}")
             }
-            _ => write!(f, "{}", "<Unknown Type>"),
+            _ => write!(f, "<Unknown Type>"),
         }
     }
 }
