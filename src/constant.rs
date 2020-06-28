@@ -23,6 +23,16 @@ pub enum Long {
 }
 
 #[derive(Debug)]
+pub enum Double {
+    Zero,
+    One,
+    Byte,
+    Short,
+    Float,
+    Normal,
+}
+
+#[derive(Debug)]
 pub enum Date {
     Millisecond,
     Minute,
@@ -45,7 +55,7 @@ pub enum ByteCodecType {
     Ref,
     Int(Integer),
     Long(Long),
-    Double(u8),
+    Double(Double),
     Date(Date),
     Binary(Binary),
     List(List),
@@ -91,7 +101,12 @@ impl ByteCodecType {
             0x59 => ByteCodecType::Long(Long::Int32Long),
             b'L' => ByteCodecType::Long(Long::NormalLong),
             // Double
-            b'D' | 0x5b..=0x5f => ByteCodecType::Double(c),
+            0x5b => ByteCodecType::Double(Double::Zero),
+            0x5c => ByteCodecType::Double(Double::One),
+            0x5d => ByteCodecType::Double(Double::Byte),
+            0x5e => ByteCodecType::Double(Double::Short),
+            0x5f => ByteCodecType::Double(Double::Float),
+            b'D' => ByteCodecType::Double(Double::Normal),
             // Date
             0x4a => ByteCodecType::Date(Date::Millisecond),
             0x4b => ByteCodecType::Date(Date::Minute),

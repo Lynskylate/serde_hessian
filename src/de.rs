@@ -3,7 +3,7 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Date, Integer, List, Long};
+use super::constant::{Binary, ByteCodecType, Date, Double, Integer, List, Long};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
 use super::value::{self, Defintion, Value};
@@ -239,7 +239,6 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
             Integer::ShortInt(b) => {
                 let bs = self.read_bytes(2)?;
-                //TODO: Optimize the code style
                 Ok(Value::Int(
                     i32::from_be_bytes([b.overflowing_sub(0xd4).0, bs[0], bs[1], 0x00]) >> 8,
                 ))
@@ -347,15 +346,14 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// Doubles which are equivalent to their 32-bit float representation
     /// can be represented as the 4-octet float and then cast to double.
     ///
-    fn read_double(&mut self, tag: u8) -> Result<Value> {
+    fn read_double(&mut self, tag: Double) -> Result<Value> {
         let val = match tag {
-            b'D' => self.buffer.read_f64::<BigEndian>()?,
-            0x5b => 0.0,
-            0x5c => 1.0,
-            0x5d => self.buffer.read_i8()? as f64,
-            0x5e => self.buffer.read_i16::<BigEndian>()? as f64,
-            0x5f => (self.buffer.read_i32::<BigEndian>()? as f64) * 0.001,
-            _ => todo!(),
+            Double::Normal => self.buffer.read_f64::<BigEndian>()?,
+            Double::Zero => 0.0,
+            Double::One => 1.0,
+            Double::Byte => self.buffer.read_i8()? as f64,
+            Double::Short => self.buffer.read_i16::<BigEndian>()? as f64,
+            Double::Float => (self.buffer.read_i32::<BigEndian>()? as f64) * 0.001,
         };
         Ok(Value::Double(val))
     }
