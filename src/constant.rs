@@ -1,3 +1,5 @@
+use std::fmt;
+
 #[derive(Debug)]
 pub enum Binary {
     Short(u8),
@@ -46,6 +48,18 @@ pub enum List {
 }
 
 #[derive(Debug)]
+pub enum String {
+    /// string of length 0-31
+    Compact(u8),
+    /// string of length 0-1023
+    Small(u8),
+    /// non-final chunk
+    Chunk,
+    /// final chunk
+    FinalChunk,
+}
+
+#[derive(Debug)]
 pub enum ByteCodecType {
     True,
     False,
@@ -60,8 +74,7 @@ pub enum ByteCodecType {
     Binary(Binary),
     List(List),
     Map(bool /*typed*/),
-    // TODO: use enum to eliminate impossible states
-    String(u8),
+    String(String),
     Unknown,
 }
 
@@ -111,8 +124,36 @@ impl ByteCodecType {
             0x34..=0x37 => ByteCodecType::Binary(Binary::TwoOctet(c)),
             b'B' | 0x41 => ByteCodecType::Binary(Binary::Long(c)),
             // String
-            0x00..=0x1f | 0x30..=0x33 | 0x52 | b'S' => ByteCodecType::String(c),
+            // ::= [x00-x1f] <utf8-data>         # string of length 0-31
+            0x00..=0x1f => ByteCodecType::String(String::Compact(c)),
+            // ::= [x30-x34] <utf8-data>         # string of length 0-1023
+            0x30..=0x33 => ByteCodecType::String(String::Small(c)),
+            // x52 ('R') represents any non-final chunk
+            0x52 => ByteCodecType::String(String::Chunk),
+            // x53 ('S') represents the final chunk
+            b'S' => ByteCodecType::String(String::FinalChunk),
             _ => ByteCodecType::Unknown,
+        }
+    }
+}
+
+impl fmt::Display for ByteCodecType {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        match self {
+            ByteCodecType::Int(_) => write!(f, "int"),
+            ByteCodecType::Long(_) => write!(f, "long"),
+            ByteCodecType::Double(_) => write!(f, "double"),
+            ByteCodecType::Date(_) => write!(f, "date"),
+            ByteCodecType::Binary(_) => write!(f, "binary"),
+            ByteCodecType::String(_) => write!(f, "string"),
+            ByteCodecType::List(_) => write!(f, "list"),
+            ByteCodecType::Map(_) => write!(f, "map"),
+            ByteCodecType::True | ByteCodecType::False => write!(f, "bool"),
+            ByteCodecType::Null => write!(f, "null"),
+            ByteCodecType::Definition => write!(f, "definition"),
+            ByteCodecType::Ref => write!(f, "ref"),
+            ByteCodecType::Object => write!(f, "object"),
+            ByteCodecType::Unknown => write!(f, "unknown"),
         }
     }
 }

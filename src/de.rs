@@ -3,7 +3,9 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom};
 
 use byteorder::{BigEndian, ReadBytesExt};
 
-use super::constant::{Binary, ByteCodecType, Date, Double, Integer, List, Long};
+use super::constant::{
+    Binary, ByteCodecType, Date, Double, Integer, List, Long, String as StringType,
+};
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
 use super::value::{self, Defintion, Value};
@@ -406,33 +408,35 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(s)
     }
 
-    fn read_string_internal(&mut self, tag: u8) -> Result<Vec<u8>> {
+    fn read_string_internal(&mut self, tag: StringType) -> Result<Vec<u8>> {
         // TODO: remove unnecessary copying
         let mut buf = Vec::new();
         match tag {
-            // ::= [x00-x1f] <utf8-data>         # string of length 0-31
-            0x00..=0x1f => {
-                let len = tag as usize - 0x00;
+            StringType::Compact(b) => {
+                let len = b as usize - 0x00;
                 buf.extend_from_slice(&self.read_utf8_string(len)?);
             }
-            // ::= [x30-x34] <utf8-data>         # string of length 0-1023
-            0x30..=0x33 => {
-                let len = (tag as usize - 0x30) * 256 + self.read_byte()? as usize;
+            StringType::Small(b) => {
+                let len = (b as usize - 0x30) * 256 + self.read_byte()? as usize;
                 buf.extend_from_slice(&self.read_utf8_string(len)?);
             }
-            // x52 ('R') represents any non-final chunk
-            0x52 => {
+            StringType::Chunk => {
                 let len = self.buffer.read_u16::<BigEndian>()? as usize;
                 buf.extend_from_slice(&self.read_utf8_string(len)?);
-                let next_tag = self.read_byte()?;
-                buf.extend_from_slice(&self.read_string_internal(next_tag)?);
+                let next_tag = ByteCodecType::from(self.read_byte()?);
+                match next_tag {
+                    ByteCodecType::String(s) => {
+                        buf.extend_from_slice(&self.read_string_internal(s)?);
+                    }
+                    _ => {
+                        return self.error(ErrorKind::UnexpectedType(next_tag.to_string()));
+                    }
+                }
             }
-            // x53 ('S') represents the final chunk
-            0x53 => {
+            StringType::FinalChunk => {
                 let len = self.buffer.read_u16::<BigEndian>()? as usize;
                 buf.extend_from_slice(&self.read_utf8_string(len)?);
             }
-            _ => { /* should not happen */ }
         }
         Ok(buf)
     }
@@ -464,7 +468,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// [x00-x1f] <utf8-data>
     /// ```
     ///
-    fn read_string(&mut self, tag: u8) -> Result<Value> {
+    fn read_string(&mut self, tag: StringType) -> Result<Value> {
         let buf = self.read_string_internal(tag)?;
         let s = unsafe { String::from_utf8_unchecked(buf) };
         Ok(Value::String(s))
