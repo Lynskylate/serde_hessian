@@ -1,12 +1,15 @@
 [package]
 name = "hessian_rs"
-version = "0.0.2"
+version = "0.0.3"
 authors = ["lynskylate <lynskylate@gmail.com>"]
 edition = "2018"
+exclude = ["tests/fixtures/**/*"]
 keywords = ["serialization", "hessian2", "serde"]
 categories = ["encoding"]
 description = "hessian2 codec implemention"
 license = "GPL-3.0-or-later"
+homepage = "https://github.com/Lynskylate/serde_hessian"
+repository = "https://github.com/Lynskylate/serde_hessian.git"
 
 [dependencies]
 ordered-float = "1.0"
