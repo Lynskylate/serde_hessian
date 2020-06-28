@@ -322,6 +322,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
     }
 }
 
+/// Serialize a `Value` to bytes
 pub fn to_vec(value: &Value) -> Result<Vec<u8>> {
     let mut buf = Vec::new();
     let mut ser = Serializer::new(&mut buf);

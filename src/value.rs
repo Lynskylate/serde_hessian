@@ -7,12 +7,14 @@ use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::ops::{Deref, DerefMut};
 
+/// class definition
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Defintion {
     pub name: String,
     pub fields: Vec<String>,
 }
 
+/// hessian 2.0 list
 #[derive(Clone, Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum List {
     Typed(String, Vec<Value>),
@@ -74,6 +76,7 @@ impl DerefMut for List {
     }
 }
 
+/// hessian 2.0 map
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum Map {
     Typed(String, HashMap<Value, Value>),
@@ -135,19 +138,31 @@ impl DerefMut for Map {
     }
 }
 
+/// hessian 2.0 value type
 #[derive(Clone, Debug, PartialEq)]
 pub enum Value {
+    /// null
     Null,
     // ClassDef,
+    /// boolean
     Bool(bool),
+    /// 32-bit int
     Int(i32),
+    /// 64-bit int
     Long(i64),
+    /// 64-bit double
     Double(f64),
+    /// 64-bit millisecond date
     Date(i64),
+    /// raw binary data
     Bytes(Vec<u8>),
+    /// UTF8-encoded string
     String(String),
+    /// shared and circular object references
     Ref(u32),
+    // list for lists and arrays
     List(List),
+    /// map for maps and dictionaries
     Map(Map),
 }
 

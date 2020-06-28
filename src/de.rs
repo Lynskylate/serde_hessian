@@ -80,6 +80,34 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(())
     }
 
+    /// Read an object from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// class-def  ::= 'C(x43)' string int string*
+    ///
+    /// object     ::= 'O(x4f)' int value*
+    ///            ::= [x60-x6f] value*
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##object
+    ///
+    /// class definition:
+    /// Hessian 2.0 has a compact object form where the field names are only serialized once.
+    /// Following objects only need to serialize their values.
+    ///
+    /// The object definition includes a mandatory type string,
+    /// the number of fields, and the field names.
+    /// The object definition is stored in the object definition map
+    /// and will be referenced by object instances with an integer reference.
+    ///
+    /// object instantiation:
+    /// Hessian 2.0 has a compact object form where the field names are only serialized once.
+    /// Following objects only need to serialize their values.
+    ///
+    /// The object instantiation creates a new object based on a previous definition.
+    /// The integer value refers to the object definition.
+    ///
     fn read_object(&mut self) -> Result<Value> {
         let val = self.read_value()?;
         if let Value::Int(i) = val {
@@ -131,6 +159,27 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::Bytes(buf))
     }
 
+    /// read bytes from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// binary ::= x41(A) b1 b0 <binary-data> binary
+    ///        ::= x42(B) b1 b0 <binary-data>
+    ///        ::= [x20-x2f] <binary-data>
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##binary
+    ///
+    /// The octet x42 ('B') encodes the final chunk and
+    /// x41 ('A') represents any non-final chunk.
+    /// Each chunk has a 16-bit length value.
+    ///
+    /// len = 256/// b1 + b0
+    ///
+    /// Binary data with length less than 15 may be encoded by a single octet length [x20-x2f].
+    ///
+    /// len = code - 0x20
+    ///
     fn read_binary(&mut self, bin: Binary) -> Result<Value> {
         match bin {
             Binary::ShortBinary(b) => Ok(Value::Bytes(self.read_bytes((b - 0x20) as usize)?)),
@@ -143,6 +192,42 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    /// read a int from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// int ::= I(x49) b3 b2 b1 b0
+    ///     ::= [x80-xbf]
+    ///     ::= [xc0-xcf] b0
+    ///     ::= [xd0-xd7] b1 b0
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##int
+    ///
+    /// A 32-bit signed integer. An integer is represented by the octet x49 ('I')
+    /// followed by the 4 octets of the integer in big-endian order.
+    /// ```
+    /// value = (b3 << 24) + (b2 << 16) + (b1 << 8) + b0;
+    /// ```
+    ///
+    /// single octet integers:
+    /// Integers between -16 and 47 can be encoded by a single octet in the range x80 to xbf.
+    /// ```
+    /// value = code - 0x90
+    /// ```
+    ///
+    /// two octet integers:
+    /// Integers between -2048 and 2047 can be encoded in two octets with the leading byte in the range xc0 to xcf.
+    /// ```
+    /// value = ((code - 0xc8) << 8) + b0;
+    /// ```
+    ///
+    /// three octet integers:
+    /// Integers between -262144 and 262143 can be encoded in three bytes with the leading byte in the range xd0 to xd7.
+    /// ```
+    /// value = ((code - 0xd4) << 16) + (b1 << 8) + b0;
+    /// ```
+    ///
     fn read_int(&mut self, i: Integer) -> Result<Value> {
         match i {
             Integer::DirectInt(b) => Ok(Value::Int(b as i32 - 0x90)),
@@ -166,6 +251,46 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    /// read a long from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// long ::= L(x4c) b7 b6 b5 b4 b3 b2 b1 b0
+    ///      ::= [xd8-xef]
+    ///      ::= [xf0-xff] b0
+    ///      ::= [x38-x3f] b1 b0
+    ///      ::= x4c b3 b2 b1 b0
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##long
+    ///
+    /// A 64-bit signed integer. An long is represented by the octet x4c ('L' )
+    /// followed by the 8-bytes of the integer in big-endian order.
+    ///
+    /// single octet longs:
+    /// Longs between -8 and 15 are represented by a single octet in the range xd8 to xef.
+    /// ```
+    /// value = (code - 0xe0)
+    /// ```
+    ///
+    /// two octet longs:
+    /// Longs between -2048 and 2047 are encoded in two octets with the leading byte in the range xf0 to xff.
+    /// ```
+    /// value = ((code - 0xf8) << 8) + b0
+    /// ```
+    ///
+    /// three octet longs:
+    /// Longs between -262144 and 262143 are encoded in three octets with the leading byte in the range x38 to x3f.
+    /// ```
+    /// value = ((code - 0x3c) << 16) + (b1 << 8) + b0
+    /// ```
+    ///
+    /// four octet longs:
+    /// Longs between which fit into 32-bits are encoded in five octets with the leading byte x59.
+    /// ```
+    /// value = (b3 << 24) + (b2 << 16) + (b1 << 8) + b0
+    /// ```
+    ///
     fn read_long(&mut self, l: Long) -> Result<Value> {
         match l {
             Long::DirectLong(b) => Ok(Value::Long(b as i64 - 0xe0)),
@@ -187,6 +312,41 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    /// read a double from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// double ::= D(x44) b7 b6 b5 b4 b3 b2 b1 b0
+    ///        ::= x5b
+    ///        ::= x5c
+    ///        ::= x5d(byte) b0
+    ///        ::= x5e(short) b1 b0
+    ///        ::= x5f(float) b3 b2 b1 b0
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##double
+    ///
+    /// The double 0.0 can be represented by the octet x5b
+    /// The double 1.0 can be represented by the octet x5c
+    ///
+    /// double octet:
+    /// Doubles between -128.0 and 127.0 with no fractional component
+    /// can be represented in two octets by casting the byte value to a double.
+    /// ```
+    /// value = (double) b0
+    /// ```
+    ///
+    /// double short:
+    /// Doubles between -32768.0 (-0x8000) and 32767.0(0x8000 - 1) with no fractional component
+    /// can be represented in three octets by casting the short value to a double.
+    /// ```
+    /// value = (double) (256/// b1 + b0)
+    /// ```
+    ///
+    /// double float:
+    /// Doubles which are equivalent to their 32-bit float representation
+    /// can be represented as the 4-octet float and then cast to double.
+    ///
     fn read_double(&mut self, tag: u8) -> Result<Value> {
         let val = match tag {
             b'D' => self.buffer.read_f64::<BigEndian>()?,
@@ -200,6 +360,16 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(Value::Double(val))
     }
 
+    /// read a date from buffer,
+    ///
+    /// v2.0
+    /// ```
+    /// date ::= x4a(J) b7 b6 b5 b4 b3 b2 b1 b0 // Date represented by a 64-bit long of milliseconds since Jan 1 1970 00:00H, UTC.
+    ///      ::= x4b(K) b4 b3 b2 b1 b0          // The second form contains a 32-bit int of minutes since Jan 1 1970 00:00H, UTC.
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##date
+    ///
     fn read_date(&mut self, d: Date) -> Result<Value> {
         let val = match d {
             Date::Millisecond => self.buffer.read_i64::<BigEndian>()?,
@@ -269,12 +439,46 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(buf)
     }
 
+    /// read a string from buffer
+    ///
+    /// The length is the number of characters, which may be different than the number of bytes.
+    ///
+    /// v2.0
+    /// ```
+    /// string ::= R(x52) b1 b0 <utf8-data> string  # non-final chunk
+    ///        ::= S(x53) b1 b0 <utf8-data>         # string of length 0-65535
+    ///        ::= [x00-x1f] <utf8-data>            # string of length 0-31
+    ///        ::= [x30-x33] b0 <utf8-data>         # string of length 0-1023
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##string
+    ///
+    /// A 16-bit unicode character string encoded in UTF-8. Strings are encoded in chunks.
+    /// x53 ('S') represents the final chunk and x52 ('R') represents any non-final chunk.
+    /// Each chunk has a 16-bit unsigned integer length value.
+    ///
+    /// The length is the number of 16-bit characters, which may be different than the number of bytes.
+    /// String chunks may not split surrogate pairs.
+    ///
+    /// short strings:
+    /// Strings with length less than 32 may be encoded with a single octet length [x00-x1f].
+    /// ```
+    /// [x00-x1f] <utf8-data>
+    /// ```
+    ///
     fn read_string(&mut self, tag: u8) -> Result<Value> {
         let buf = self.read_string_internal(tag)?;
         let s = unsafe { String::from_utf8_unchecked(buf) };
         Ok(Value::String(s))
     }
 
+    /// v2.0
+    /// ```
+    /// ref ::= (0x51) int(putInt)
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##ref
+    ///
     fn read_type(&mut self) -> Result<String> {
         match self.read_value() {
             Ok(Value::String(s)) => {
@@ -293,7 +497,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
-    fn read_varlength_map_interal(&mut self) -> Result<HashMap<Value, Value>> {
+    fn read_varlength_map_internal(&mut self) -> Result<HashMap<Value, Value>> {
         let mut map = HashMap::new();
         let mut tag = self.peek_byte()?;
         while tag != b'Z' {
@@ -325,6 +529,31 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(list)
     }
 
+    /// read an array from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// list ::= x55 type value* 'Z'   # variable-length list
+    ///      ::= 'V(x56)' type int value*   # fixed-length list
+    ///      ::= x57 value* 'Z'        # variable-length untyped list
+    ///      ::= x58 int value*        # fixed-length untyped list
+    ///      ::= [x70-77] type value*  # fixed-length typed list
+    ///      ::= [x78-7f] value*       # fixed-length untyped list
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##list
+    ///
+    /// An ordered list, like an array.
+    /// The two list productions are a fixed-length list and a variable length list.
+    /// Both lists have a type.
+    /// The type string may be an arbitrary UTF-8 string understood by the service.
+    ///
+    /// fixed length list:
+    /// Hessian 2.0 allows a compact form of the list for successive lists of
+    /// the same type where the length is known beforehand.
+    /// The type and length are encoded by integers,
+    /// where the type is a reference to an earlier specified type.
+    ///
     fn read_list(&mut self, list: List) -> Result<Value> {
         // TODO(lynskylate@gmail.com): Should add list to reference, but i don't know any good way to deal with it
         match list {
@@ -372,16 +601,47 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    /// read an map from buffer
+    ///
+    /// v2.0
+    /// ```
+    /// map        ::= 'M' type (value value)* 'Z'  # key, value map pairs
+    ///            ::= 'H' (value value)* 'Z'       # untyped key, value
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##map
+    ///
+    /// Represents serialized maps and can represent objects.
+    /// The type element describes the type of the map.
+    /// The type may be empty, i.e. a zero length.
+    /// The parser is responsible for choosing a type if one is not specified.
+    /// For objects, unrecognized keys will be ignored.
+    ///
+    /// Each map is added to the reference list. Any time the parser expects a map,
+    /// it must also be able to support a null or a ref.
+    ///
+    /// The type is chosen by the service.
+    ///
     fn read_map(&mut self, typed: bool) -> Result<Value> {
         let map = if typed {
             let typ = self.read_type()?;
-            value::Map::from((typ, self.read_varlength_map_interal()?))
+            value::Map::from((typ, self.read_varlength_map_internal()?))
         } else {
-            value::Map::from(self.read_varlength_map_interal()?)
+            value::Map::from(self.read_varlength_map_internal()?)
         };
         Ok(Value::Map(map))
     }
 
+    /// v2.0
+    /// ```
+    /// ref ::= Q(x51) int
+    /// ```
+    ///
+    /// See http://hessian.caucho.com/doc/hessian-serialization.html##ref
+    ///
+    /// Each map or list is stored into an array as it is parsed.
+    /// ref selects one of the stored objects. The first object is numbered '0'.
+    ///
     fn read_ref(&mut self) -> Result<Value> {
         match self.read_value()? {
             Value::Int(i) => Ok(Value::Ref(i as u32)),
@@ -389,6 +649,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         }
     }
 
+    /// Read a hessian 2.0 value
     pub fn read_value(&mut self) -> Result<Value> {
         let v = self.read_byte()?;
         match ByteCodecType::from(v) {
@@ -414,6 +675,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 }
 
+/// Read a hessain 2.0 value from a slice
 pub fn from_slice(v: &[u8]) -> Result<Value> {
     let mut de = Deserializer::new(v);
     let value = de.read_value()?;
