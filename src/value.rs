@@ -290,14 +290,14 @@ impl Value {
         self.as_int().is_some()
     }
 
-    pub fn as_map(&self) -> Option<&HashMap<Value, Value>> {
+    pub fn as_map(&self) -> Option<&Map> {
         match self {
             Value::Map(m) => Some(m),
             _ => None,
         }
     }
 
-    pub fn as_map_mut(&mut self) -> Option<&mut HashMap<Value, Value>> {
+    pub fn as_map_mut(&mut self) -> Option<&mut Map> {
         match self {
             Value::Map(m) => Some(m),
             _ => None,
@@ -481,6 +481,47 @@ impl<'a> ToHessian for &'a [u8] {
 impl<'a> ToHessian for &'a Vec<u8> {
     fn to_hessian(self) -> Value {
         Value::Bytes(self.to_owned())
+    }
+}
+
+impl<T> ToHessian for HashMap<T, T>
+where
+    T: ToHessian,
+{
+    fn to_hessian(self) -> Value {
+        let kv: HashMap<Value, Value> = self
+            .into_iter()
+            .map(|(k, v)| (k.to_hessian(), v.to_hessian()))
+            .collect();
+        Value::Map(kv.into())
+    }
+}
+
+impl<T> ToHessian for (String, HashMap<T, T>)
+where
+    T: ToHessian,
+{
+    fn to_hessian(self) -> Value {
+        let (typ, kv) = self;
+        let kv: HashMap<Value, Value> = kv
+            .into_iter()
+            .map(|(k, v)| (k.to_hessian(), v.to_hessian()))
+            .collect();
+        Value::Map((typ, kv.into()).into())
+    }
+}
+
+impl<T> ToHessian for (&str, HashMap<T, T>)
+where
+    T: ToHessian,
+{
+    fn to_hessian(self) -> Value {
+        let (typ, kv) = self;
+        let kv: HashMap<Value, Value> = kv
+            .into_iter()
+            .map(|(k, v)| (k.to_hessian(), v.to_hessian()))
+            .collect();
+        Value::Map((typ, kv.into()).into())
     }
 }
 

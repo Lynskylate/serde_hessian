@@ -111,3 +111,99 @@ fn test_decode_list() {
         )
     );
 }
+
+#[test]
+fn test_decode_map() {
+    use maplit::hashmap;
+
+    assert_eq!(
+        load_value_from_file("tests/fixtures/map/car.bin").unwrap(),
+        Value::Map(
+            hashmap! {
+                "a".into() => "a".into(),
+                "b".into() => "b".into(),
+                "c".into() => "c".into(),
+                "model".into() => "Beetle".into(),
+                "color".into() => "aquamarine".into(),
+                "mileage".into() => Value::Int(65536),
+            }
+            .into()
+        )
+    );
+
+    assert_eq!(
+        load_value_from_file("tests/fixtures/map/car1.bin").unwrap(),
+        Value::Map(
+            hashmap! {
+                "prev".into() => Value::Null,
+                "self".into() => Value::Ref(0),
+                "model".into() => "Beetle".into(),
+                "color".into() => "aquamarine".into(),
+                "mileage".into() => Value::Int(65536),
+            }
+            .into()
+        )
+    );
+
+    assert_eq!(
+        load_value_from_file("tests/fixtures/map/foo_empty.bin").unwrap(),
+        Value::Map(
+            hashmap! {
+                "foo".into() => "".into(),
+            }
+            .into()
+        )
+    );
+
+    assert_eq!(
+        load_value_from_file("tests/fixtures/map/foo_bar.bin").unwrap(),
+        Value::Map(
+            hashmap! {
+                "foo".into() => "bar".into(),
+                "123".into() => Value::Int(456),
+                "zero".into() => Value::Int(0),
+                "中文key".into() => "中文哈哈value".into(),
+            }
+            .into()
+        )
+    );
+
+    assert_eq!(
+        load_value_from_file("tests/fixtures/map/hashtable.bin").unwrap(),
+        Value::Map(
+            (
+                "java.util.Hashtable",
+                hashmap! {
+                    "foo".into() => "bar".into(),
+                    "中文key".into() => "中文哈哈value".into(),
+                }
+            )
+                .into()
+        )
+    );
+
+    assert_eq!(
+        load_value_from_file("tests/fixtures/map/generic.bin").unwrap(),
+        Value::Map(
+            hashmap! {
+                Value::Long(123) => Value::Int(123456),
+                Value::Long(123456) => Value::Int(123),
+            }
+            .into()
+        )
+    );
+
+    let val = load_value_from_file("tests/fixtures/map/hashmap.bin").unwrap();
+    let map = val.as_map().unwrap();
+    let data = &map[&"data".into()];
+    let data = data.as_map().unwrap();
+    assert_eq!(data.len(), 2);
+
+    let val = load_value_from_file("tests/fixtures/map/custom_map_type.bin").unwrap();
+    let list = val.as_list().unwrap();
+    assert_eq!(list.r#type().unwrap(), "com.alibaba.fastjson.JSONArray");
+    let item0 = &list[0];
+    let map = item0.as_map().unwrap();
+    assert_eq!(map.r#type().unwrap(), "com.alibaba.fastjson.JSONObject");
+    assert_eq!(map.len(), 3);
+}

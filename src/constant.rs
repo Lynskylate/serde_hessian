@@ -60,12 +60,18 @@ pub enum String {
 }
 
 #[derive(Debug)]
+pub enum Object {
+    Compact(u8),
+    Normal,
+}
+
+#[derive(Debug)]
 pub enum ByteCodecType {
     True,
     False,
     Null,
     Definition,
-    Object,
+    Object(Object),
     Ref,
     Int(Integer),
     Long(Long),
@@ -96,7 +102,8 @@ impl ByteCodecType {
             0x58 => ByteCodecType::List(List::FixedLength(false)),
             0x70..=0x77 => ByteCodecType::List(List::ShortFixedLength(true, (c - 0x70) as usize)),
             0x78..=0x7f => ByteCodecType::List(List::ShortFixedLength(false, (c - 0x78) as usize)),
-            b'O' => ByteCodecType::Object,
+            b'O' => ByteCodecType::Object(Object::Normal),
+            0x60..=0x6f => ByteCodecType::Object(Object::Compact(c)),
             b'C' => ByteCodecType::Definition,
             // Integer
             0x80..=0xbf => ByteCodecType::Int(Integer::Direct(c)),
@@ -152,7 +159,7 @@ impl fmt::Display for ByteCodecType {
             ByteCodecType::Null => write!(f, "null"),
             ByteCodecType::Definition => write!(f, "definition"),
             ByteCodecType::Ref => write!(f, "ref"),
-            ByteCodecType::Object => write!(f, "object"),
+            ByteCodecType::Object(_) => write!(f, "object"),
             ByteCodecType::Unknown => write!(f, "unknown"),
         }
     }

@@ -4,7 +4,7 @@ use std::io::{self, Cursor, Read, Seek, SeekFrom};
 use byteorder::{BigEndian, ReadBytesExt};
 
 use super::constant::{
-    Binary, ByteCodecType, Date, Double, Integer, List, Long, String as StringType,
+    Binary, ByteCodecType, Date, Double, Integer, List, Long, Object, String as StringType,
 };
 use super::error::Error::SyntaxError;
 use super::error::{ErrorKind, Result};
@@ -111,24 +111,29 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// The object instantiation creates a new object based on a previous definition.
     /// The integer value refers to the object definition.
     ///
-    fn read_object(&mut self) -> Result<Value> {
-        let val = self.read_value()?;
-        if let Value::Int(i) = val {
-            let definition = self
-                .class_references
-                .get(i as usize)
-                .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(i as usize)))?
-                .clone();
-
-            let mut map = HashMap::new();
-            for k in definition.fields {
-                let v = self.read_value()?;
-                map.insert(Value::String(k), v);
+    fn read_object(&mut self, tag: Object) -> Result<Value> {
+        let ref_id = match tag {
+            Object::Compact(b) => b as usize - 0x60,
+            Object::Normal => {
+                let val = self.read_value()?;
+                match val {
+                    Value::Int(i) => i as usize,
+                    _ => return self.error(ErrorKind::UnexpectedType(val.to_string())),
+                }
             }
-            Ok(Value::Map(map.clone().into()))
-        } else {
-            self.error(ErrorKind::UnexpectedType(val.to_string()))
+        };
+        let definition = self
+            .class_references
+            .get(ref_id)
+            .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(ref_id)))?
+            .clone();
+
+        let mut map = HashMap::new();
+        for k in definition.fields {
+            let v = self.read_value()?;
+            map.insert(Value::String(k), v);
         }
+        Ok(Value::Map(map.clone().into()))
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -671,7 +676,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 self.read_value()
             }
             ByteCodecType::Ref => self.read_ref(),
-            ByteCodecType::Object => self.read_object(),
+            ByteCodecType::Object(o) => self.read_object(o),
             _ => self.error(ErrorKind::UnknownType),
         }
     }
