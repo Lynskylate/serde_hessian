@@ -182,6 +182,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
+    #[allow(clippy::match_overlapping_arm)]
     fn serialize_long(&mut self, v: i64) -> Result<()> {
         let bytes = match v {
             -8..=15 => vec![(0xe0 + v) as u8],
@@ -204,6 +205,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
+    #[allow(clippy::match_overlapping_arm)]
     fn serialize_int(&mut self, v: i32) -> Result<()> {
         let bytes = match v {
             -16..=47 => vec![(0x90 + v) as u8],
@@ -226,6 +228,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
+    #[allow(clippy::match_overlapping_arm)]
     fn serialize_double(&mut self, v: f64) -> Result<()> {
         let int_v = v.trunc() as i32;
         if (int_v as f64 - v).abs() < f64::EPSILON {

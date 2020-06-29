@@ -595,14 +595,14 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                     let typ = self.read_type()?;
                     let length = match self.read_value()? {
                         Value::Int(l) => l as usize,
-                        v @ _ => return self.error(ErrorKind::UnexpectedType(v.to_string())),
+                        v => return self.error(ErrorKind::UnexpectedType(v.to_string())),
                     };
                     let val = self.read_exact_length_list_internal(length)?;
                     value::List::from((typ, val))
                 } else {
                     let length = match self.read_value()? {
                         Value::Int(l) => l as usize,
-                        v @ _ => return self.error(ErrorKind::UnexpectedType(v.to_string())),
+                        v => return self.error(ErrorKind::UnexpectedType(v.to_string())),
                     };
                     let val = self.read_exact_length_list_internal(length)?;
                     value::List::from(val)
@@ -656,7 +656,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     fn read_ref(&mut self) -> Result<Value> {
         match self.read_value()? {
             Value::Int(i) => Ok(Value::Ref(i as u32)),
-            v @ _ => self.error(ErrorKind::UnexpectedType(v.to_string())),
+            v => self.error(ErrorKind::UnexpectedType(v.to_string())),
         }
     }
 
