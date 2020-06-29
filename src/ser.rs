@@ -465,61 +465,61 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_bool(self, value: bool) -> Result<()> {
-        self.serialize_bool(value.into())
+        self.serialize_bool(value)
     }
 
     #[inline]
     fn serialize_i8(self, value: i8) -> Result<()> {
-        self.serialize_int((value as i32).into())
+        self.serialize_int(value as i32)
     }
 
     #[inline]
     fn serialize_i16(self, value: i16) -> Result<()> {
-        self.serialize_int((value as i32).into())
+        self.serialize_int(value as i32)
     }
 
     #[inline]
     fn serialize_i32(self, value: i32) -> Result<()> {
-        self.serialize_int(value.into())
+        self.serialize_int(value)
     }
 
     #[inline]
     fn serialize_i64(self, value: i64) -> Result<()> {
-        self.serialize_long(value.into())
+        self.serialize_long(value)
     }
 
     #[inline]
     fn serialize_u8(self, value: u8) -> Result<()> {
-        self.serialize_int((value as i32).into())
+        self.serialize_int(value as i32)
     }
 
     #[inline]
     fn serialize_u16(self, value: u16) -> Result<()> {
-        self.serialize_int((value as i32).into())
+        self.serialize_int(value as i32)
     }
 
     #[inline]
     fn serialize_u32(self, value: u32) -> Result<()> {
         if value < i32::max_value as u32 {
-            self.serialize_int((value as i32).into())
+            self.serialize_int(value as i32)
         } else {
-            self.serialize_long((value as i64).into())
+            self.serialize_long(value as i64)
         }
     }
 
     #[inline]
     fn serialize_u64(self, value: u64) -> Result<()> {
-        self.serialize_long((value as i64).into())
+        self.serialize_long(value as i64)
     }
 
     #[inline]
     fn serialize_f32(self, value: f32) -> Result<()> {
-        self.serialize_double((value as f64).into())
+        self.serialize_double(value as f64)
     }
 
     #[inline]
     fn serialize_f64(self, value: f64) -> Result<()> {
-        self.serialize_double((value as f64).into())
+        self.serialize_double(value as f64)
     }
 
     #[inline]
