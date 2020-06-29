@@ -83,10 +83,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             }
         }
 
-        self.class_references.push(Definition {
-            name: name,
-            fields: fields,
-        });
+        self.class_references.push(Definition { name, fields });
         Ok(())
     }
 
@@ -142,7 +139,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
             let v = self.read_value()?;
             map.insert(Value::String(k), v);
         }
-        Ok(Value::Map((name, map.clone()).into()))
+        Ok(Value::Map((name, map).into()))
     }
 
     fn read_long_binary(&mut self, tag: u8) -> Result<Value> {
@@ -416,7 +413,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 }
                 _ => {}
             }
-            len = len - 1;
+            len -= 1
         }
         Ok(())
     }
@@ -424,7 +421,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     fn read_string_internal(&mut self, buf: &mut Vec<u8>, tag: StringType) -> Result<()> {
         match tag {
             StringType::Compact(b) => {
-                let len = b as usize - 0x00;
+                let len = b as usize;
                 self.read_utf8_string(buf, len)?;
             }
             StringType::Small(b) => {
@@ -500,7 +497,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 Ok(s)
             }
             Ok(Value::Int(i)) => {
-                if let Some(res) = self.type_references.iter().nth(i as usize) {
+                if let Some(res) = self.type_references.get(i as usize) {
                     Ok(res.clone())
                 } else {
                     self.error(ErrorKind::OutOfTypeRefRange(i as usize))
