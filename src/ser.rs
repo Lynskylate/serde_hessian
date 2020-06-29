@@ -500,7 +500,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_u32(self, value: u32) -> Result<()> {
-        if value < i32::max_value as u32 {
+        if value < i32::max_value() as u32 {
             self.serialize_int(value as i32)
         } else {
             self.serialize_long(value as i64)
