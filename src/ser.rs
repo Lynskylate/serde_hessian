@@ -719,7 +719,10 @@ mod tests {
 
         // serialize tuple variant, use variant as list name
         let t = E::Tuple(1, 2);
-        assert_eq!(to_bytes(&t).unwrap(), &[0x72, 0x05, b'T', b'u', b'p', b'l', b'e', 0x91, 0x92]);
+        assert_eq!(
+            to_bytes(&t).unwrap(),
+            &[0x72, 0x05, b'T', b'u', b'p', b'l', b'e', 0x91, 0x92]
+        );
 
         // serialize Variant Struct, use variant naeme as map name
         let s = E::Struct { a: 1 };
