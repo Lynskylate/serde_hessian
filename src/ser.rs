@@ -527,9 +527,8 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_char(self, value: char) -> Result<()> {
-        let mut string = String::with_capacity(4); // longest utf-8 encoding
-        string.push(value);
-        self.serialize_string(&string)
+        let mut buf = [0; 4];
+        self.serialize_string(value.encode_utf8(&mut buf))
     }
 
     #[inline]
