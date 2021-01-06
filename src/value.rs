@@ -564,6 +564,7 @@ impl fmt::Display for Value {
             Value::Null => write!(f, "None"),
             Value::Bool(b) => write!(f, "{}", if b { "True" } else { "False" }),
             Value::Int(ref i) => write!(f, "{}", i),
+            Value::Long(ref i) => write!(f, "{}", i),
             Value::Double(ref v) => write!(f, "{}", v),
             Value::Date(v) => write!(f, "Date({})", v),
             Value::Bytes(ref b) => write!(f, "b{:?}", b), //
