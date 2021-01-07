@@ -1,6 +1,7 @@
+use serde::ser;
 use std::result;
 use std::string::FromUtf8Error;
-use std::{fmt, io};
+use std::{error, fmt, io};
 
 #[derive(Clone, PartialEq, Debug)]
 pub enum ErrorKind {
@@ -53,3 +54,11 @@ impl From<FromUtf8Error> for Error {
 }
 
 pub type Result<T> = result::Result<T, Error>;
+
+impl ser::Error for Error {
+    fn custom<T: fmt::Display>(msg: T) -> Error {
+        Error::SyntaxError(crate::ErrorKind::UnexpectedType(msg.to_string()))
+    }
+}
+
+impl error::Error for Error {}
