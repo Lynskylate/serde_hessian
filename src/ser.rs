@@ -193,7 +193,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
                 (v & 0xff) as u8,
             ],
             _ if v >= i32::min_value() as i64 && v <= i32::max_value() as i64 => vec![
-                0x59 as u8,
+                0x59_u8,
                 (v >> 24 & 0xff) as u8,
                 (v >> 16 & 0xff) as u8,
                 (v >> 8 & 0xff) as u8,
@@ -261,7 +261,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
     fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
         if v.len() < 16 {
             self.writer.write_all(&[(v.len() - 0x20) as u8])?;
-            self.writer.write_all(&v)?;
+            self.writer.write_all(v)?;
         } else {
             for (last, chunk) in v.chunks(0xffff).identify_last() {
                 let flag = if last { b'B' } else { b'A' };
@@ -329,7 +329,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
 pub fn to_vec(value: &Value) -> Result<Vec<u8>> {
     let mut buf = Vec::new();
     let mut ser = Serializer::new(&mut buf);
-    ser.serialize_value(&value)?;
+    ser.serialize_value(value)?;
     Ok(buf)
 }
 
