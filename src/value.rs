@@ -335,7 +335,7 @@ impl Value {
 
 impl PartialOrd for Value {
     fn partial_cmp(&self, other: &Value) -> Option<Ordering> {
-        Some(self.cmp(&other))
+        Some(self.cmp(other))
     }
 }
 
@@ -347,7 +347,7 @@ impl Hash for Value {
         use self::Value::*;
 
         match *self {
-            Null => ().hash(state),
+            Null => 0_u8.hash(state),
             Bool(b) => b.hash(state),
             Int(i) => i.hash(state),
             Long(l) => l.hash(state),
