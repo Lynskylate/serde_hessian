@@ -82,6 +82,21 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         }
     }
 
+    pub fn get_definition(&self, name: &str) -> Option<&Definition> {
+        self.classes_cache.get(name)
+    }
+
+    pub fn serialize_object(&mut self, obj: &value::Object) -> Result<()> {
+        let def = obj.definition;
+        let ref_num = self.write_definition(def)?;
+        self.writer.write_u8(b'O')?;
+        self.serialize_int(ref_num as i32)?;
+        for value in obj.fields.iter() {
+            self.serialize_value(value)?;
+        }
+        Ok(())
+    }
+
     // class-def  ::= 'C' string int string*
     // Write deinition if not exists in classes cache, and return ref num finally
     pub fn write_definition(&mut self, def: &Definition) -> Result<usize> {
@@ -131,7 +146,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
-    fn serialize_map(&mut self, map: &value::Map) -> Result<()> {
+    pub fn serialize_map(&mut self, map: &value::Map) -> Result<()> {
         match map.r#type() {
             Some(tp) => {
                 self.writer.write_u8(b'M')?;
@@ -149,7 +164,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
-    fn serialize_list(&mut self, list: &value::List) -> Result<()> {
+    pub fn serialize_list(&mut self, list: &value::List) -> Result<()> {
         let tp = list.r#type();
         let list = list.value();
         self.write_list_begin(list.len(), tp)?;
@@ -159,31 +174,31 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
-    fn serialize_date(&mut self, d: i64) -> Result<()> {
+    pub fn serialize_date(&mut self, d: i64) -> Result<()> {
         self.writer.write_all(&[0x4a])?;
         self.writer.write_i64::<BigEndian>(d)?;
         Ok(())
     }
 
-    fn serialize_null(&mut self) -> Result<()> {
+    pub fn serialize_null(&mut self) -> Result<()> {
         self.writer.write_all(&[b'N'])?;
         Ok(())
     }
 
-    fn serialize_bool(&mut self, value: bool) -> Result<()> {
+    pub fn serialize_bool(&mut self, value: bool) -> Result<()> {
         let f = if value { b'T' } else { b'F' };
         self.writer.write_all(&[f])?;
         Ok(())
     }
 
-    fn serialize_ref(&mut self, ref_num: u32) -> Result<()> {
+    pub fn serialize_ref(&mut self, ref_num: u32) -> Result<()> {
         self.writer.write_u8(0x51)?;
         self.serialize_int(ref_num as i32)?;
         Ok(())
     }
 
     #[allow(clippy::match_overlapping_arm)]
-    fn serialize_long(&mut self, v: i64) -> Result<()> {
+    pub fn serialize_long(&mut self, v: i64) -> Result<()> {
         let bytes = match v {
             -8..=15 => vec![(0xe0 + v) as u8],
             -2048..=2047 => vec![(((v >> 8) + 0xf8) & 0xff) as u8, (v & 0xff) as u8],
@@ -206,7 +221,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
     }
 
     #[allow(clippy::match_overlapping_arm)]
-    fn serialize_int(&mut self, v: i32) -> Result<()> {
+    pub fn serialize_int(&mut self, v: i32) -> Result<()> {
         let bytes = match v {
             -16..=47 => vec![(0x90 + v) as u8],
             -2048..=2047 => vec![(((v >> 8) & 0xff) + 0xc8) as u8, (v & 0xff) as u8],
@@ -229,7 +244,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
     }
 
     #[allow(clippy::match_overlapping_arm)]
-    fn serialize_double(&mut self, v: f64) -> Result<()> {
+    pub fn serialize_double(&mut self, v: f64) -> Result<()> {
         let int_v = v.trunc() as i32;
         if (int_v as f64 - v).abs() < f64::EPSILON {
             match int_v {
@@ -258,7 +273,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
-    fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
+    pub fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
         if v.len() < 16 {
             self.writer.write_all(&[(v.len() - 0x20) as u8])?;
             self.writer.write_all(v)?;
@@ -279,7 +294,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
     //    ::= S b1 b0 <utf8-data>
     //    ::= [x00-x1f] <utf8-data>
     //    ::= [x30-x33] b0 <utf8-data>
-    fn serialize_string(&mut self, v: &str) -> Result<()> {
+    pub fn serialize_string(&mut self, v: &str) -> Result<()> {
         const MAX_CHUNK_BYTE_SIZE: u32 = 0x8000;
         let bytes = v.as_bytes();
         let mut len = 0;
@@ -336,8 +351,9 @@ pub fn to_vec(value: &Value) -> Result<Vec<u8>> {
 #[cfg(test)]
 mod tests {
     use super::{to_vec, Serializer};
+    use crate::de::Deserializer;
     use crate::value::Value::Int;
-    use crate::value::{self, Value};
+    use crate::value::{self, ToHessian, Value};
 
     fn test_encode_ok(value: Value, target: &[u8]) {
         assert_eq!(to_vec(&value).unwrap(), target, "{:?} encode error", value);
@@ -451,5 +467,36 @@ mod tests {
         let mut ser = Serializer::new(&mut buf);
         assert!(ser.write_definition(&def).unwrap() == 0);
         assert!(ser.write_definition(&def).unwrap() == 0);
+    }
+
+    #[test]
+    fn test_encode_object() {
+        use crate::value::Definition;
+        use crate::value::Object;
+
+        let def = Definition {
+            name: "example.Car".to_string(),
+            fields: vec!["color".to_string()],
+        };
+        let obj = Object {
+            definition: &def,
+            fields: vec![Value::String("red".to_string()).into()],
+        };
+
+        let mut buf = Vec::new();
+        let mut ser = Serializer::new(&mut buf);
+        ser.serialize_object(&obj).unwrap();
+
+        let mut de = Deserializer::new(&buf);
+        let v = de.read_value().unwrap();
+        assert_eq!(
+            v.as_map()
+                .unwrap()
+                .get(&"color".to_hessian())
+                .unwrap()
+                .as_str()
+                .unwrap(),
+            "red"
+        );
     }
 }

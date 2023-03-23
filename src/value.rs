@@ -21,6 +21,11 @@ pub enum List {
     Untyped(Vec<Value>),
 }
 
+pub struct Object<'a> {
+    pub definition: &'a Definition,
+    pub fields: Vec<Value>,
+}
+
 impl List {
     pub fn r#type(&self) -> Option<&str> {
         match self {
