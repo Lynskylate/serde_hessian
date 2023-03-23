@@ -527,6 +527,16 @@ where
     }
 }
 
+impl<T> ToHessian for Vec<T>
+where
+    T: ToHessian,
+{
+    fn to_hessian(self) -> Value {
+        let v: Vec<Value> = self.into_iter().map(|t| t.to_hessian()).collect();
+        Value::List(v.into())
+    }
+}
+
 impl<K, V> ToHessian for (String, HashMap<K, V>)
 where
     K: ToHessian,
@@ -593,6 +603,45 @@ impl fmt::Display for Value {
                 write!(f, "}}")
             }
             _ => write!(f, "<Unknown Type>"),
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn test_display() {
+        use super::*;
+        {
+            let v = Value::String("hello".to_owned());
+            assert_eq!(v.to_string(), "\"hello\"");
+        }
+        {
+            let v = Value::Null;
+            assert_eq!(v.to_string(), "None");
+        }
+        {
+            let v = Value::Bool(true);
+            assert_eq!(v.to_string(), "True");
+        }
+        {
+            let v = Value::Bool(false);
+            assert_eq!(v.to_string(), "False");
+        }
+        {
+            let list = vec![1, 2, 3].to_hessian();
+            assert_eq!(list.to_string(), "[1, 2, 3]");
+        }
+        {
+            let map = {
+                let mut m = HashMap::new();
+                m.insert("a", 1);
+                m.insert("b", 2);
+                m
+            };
+            let v = map.to_hessian();
+            assert!(v.to_string().find("\"a\" : 1,").is_some());
+            assert!(v.to_string().find("\"b\" : 2,").is_some());
         }
     }
 }
