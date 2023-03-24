@@ -86,7 +86,11 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         self.classes_cache.get(name)
     }
 
-    pub fn serialize_object_with_definition(&mut self, def: &Definition, fields: &Vec<Value>) -> Result<()> {
+    pub fn serialize_object_with_definition(
+        &mut self,
+        def: &Definition,
+        fields: &Vec<Value>,
+    ) -> Result<()> {
         let ref_num = self.write_definition(def)?;
         self.writer.write_u8(b'O')?;
         self.serialize_int(ref_num as i32)?;
