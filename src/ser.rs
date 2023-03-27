@@ -86,7 +86,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         self.classes_cache.get(name)
     }
 
-    pub fn serialize_object_with_definition(
+    pub fn serialize_fields_with_definition(
         &mut self,
         def: &Definition,
         fields: &Vec<Value>,
@@ -484,7 +484,7 @@ mod tests {
 
         let mut buf = Vec::new();
         let mut ser = Serializer::new(&mut buf);
-        ser.serialize_object_with_definition(&def, &fields).unwrap();
+        ser.serialize_fields_with_definition(&def, &fields).unwrap();
 
         let mut de = Deserializer::new(&buf);
         let v = de.read_value().unwrap();
