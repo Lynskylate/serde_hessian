@@ -222,7 +222,7 @@ dependencies = [
 
 [[package]]
 name = "hessian_rs"
-version = "0.0.4-rc1"
+version = "0.0.4-rc2"
 dependencies = [
  "byteorder",
  "criterion",
