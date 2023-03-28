@@ -86,12 +86,15 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         self.classes_cache.get(name)
     }
 
-    pub fn serialize_object(&mut self, obj: &value::Object) -> Result<()> {
-        let def = obj.definition;
+    pub fn serialize_fields_with_definition(
+        &mut self,
+        def: &Definition,
+        fields: &Vec<Value>,
+    ) -> Result<()> {
         let ref_num = self.write_definition(def)?;
         self.writer.write_u8(b'O')?;
         self.serialize_int(ref_num as i32)?;
-        for value in obj.fields.iter() {
+        for value in fields.iter() {
             self.serialize_value(value)?;
         }
         Ok(())
@@ -472,20 +475,16 @@ mod tests {
     #[test]
     fn test_encode_object() {
         use crate::value::Definition;
-        use crate::value::Object;
 
         let def = Definition {
             name: "example.Car".to_string(),
             fields: vec!["color".to_string()],
         };
-        let obj = Object {
-            definition: &def,
-            fields: vec![Value::String("red".to_string())],
-        };
+        let fields = vec![Value::String("red".to_string())];
 
         let mut buf = Vec::new();
         let mut ser = Serializer::new(&mut buf);
-        ser.serialize_object(&obj).unwrap();
+        ser.serialize_fields_with_definition(&def, &fields).unwrap();
 
         let mut de = Deserializer::new(&buf);
         let v = de.read_value().unwrap();
