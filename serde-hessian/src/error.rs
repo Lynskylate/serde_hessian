@@ -10,6 +10,7 @@ use serde::ser::Error as SerError;
 #[derive(Debug)]
 pub enum Error {
     SyntaxError(ErrorKind),
+    UnexpectedError(String),
     IoError(io::Error),
     FromUtf8Error(FromUtf8Error),
 }
@@ -18,6 +19,7 @@ impl fmt::Display for Error {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
             Error::SyntaxError(err) => write!(f, "syntax error: {}", err),
+            Error::UnexpectedError(err) => write!(f, "unexpected error: {}", err),
             Error::IoError(err) => err.fmt(f),
             Error::FromUtf8Error(err) => err.fmt(f),
         }
@@ -55,6 +57,7 @@ impl SerError for Error {
 impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
+            Error::UnexpectedError(_) => None,
             Error::SyntaxError(_) => None,
             Error::IoError(err) => Some(err),
             Error::FromUtf8Error(err) => Some(err),

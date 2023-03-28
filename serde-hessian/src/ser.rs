@@ -1,8 +1,11 @@
 use crate::error::Error;
-use hessian_rs::ser::Serializer as ValueSerializer;
+use hessian_rs::{ser::Serializer as ValueSerializer, value::Definition};
 
 use serde::{ser, Serialize};
-use std::io;
+use std::{
+    cell::{Ref, RefCell, RefMut},
+    io,
+};
 
 type Result<T> = std::result::Result<T, Error>;
 
@@ -18,9 +21,12 @@ impl<W: io::Write> Serializer<W> {
     }
 }
 
-pub struct StructSerializer<W: io::Write> {
+pub struct StructSerializer<'a, W: io::Write> {
     name: &'static str,
-    ser: Serializer<W>,
+    ser: &'a mut Serializer<W>,
+    fields: Vec<&'a str>,
+    inx: usize,
+    buf: Vec<u8>,
 }
 
 pub struct MapSerializer<'a, W: io::Write> {
@@ -31,6 +37,61 @@ pub struct MapSerializer<'a, W: io::Write> {
 pub struct ListSerializer<'a, W: io::Write> {
     ser: &'a mut Serializer<W>,
     sized: bool,
+}
+
+impl<'a, W> StructSerializer<'a, W>
+where
+    W: io::Write,
+{
+    pub fn new(name: &'static str, ser: &'a mut Serializer<W>) -> Self {
+        StructSerializer {
+            name,
+            ser,
+            fields: Vec::new(),
+            inx: 0,
+            buf: Vec::new(),
+        }
+    }
+}
+
+impl<'a, W: io::Write> ser::SerializeStruct for StructSerializer<'a, W> {
+    type Ok = ();
+    type Error = Error;
+
+    fn serialize_field<U: Serialize + ?Sized>(
+        &mut self,
+        key: &'static str,
+        value: &U,
+    ) -> Result<()> {
+        if let Some(definition) = self.ser.ser.get_definition(self.name) {
+            if key != definition.fields[self.inx] {
+                return Err(Error::UnexpectedError("field name mismatch".to_string()));
+            }
+            self.inx += 1;
+        } else {
+            self.fields.push(key);
+        }
+        value.serialize(&mut Serializer::new(&mut self.buf))?;
+        Ok(())
+    }
+
+    #[inline]
+    fn end(self) -> Result<()> {
+        let def = match self.ser.ser.get_definition(&self.name) {
+            Some(def) => def.clone(),
+            None => {
+                let def = Definition {
+                    name: self.name.into(),
+                    fields: self.fields.iter().map(|v| v.to_string()).collect(),
+                };
+                self.ser.ser.write_definition(&def)?;
+                def
+            }
+        };
+        self.ser.ser.write_object_start(&def)?;
+        self.ser.ser.extend_from_slice(&self.buf)?;
+        Ok(())
+    }
 }
 
 impl<'a, W: io::Write> ser::SerializeSeq for ListSerializer<'a, W> {
@@ -180,8 +241,8 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     type SerializeTupleStruct = Self::SerializeTuple;
     type SerializeTupleVariant = Self::SerializeTuple;
     type SerializeMap = MapSerializer<'a, W>;
-    type SerializeStruct = Self::SerializeMap;
-    type SerializeStructVariant = Self::SerializeStruct;
+    type SerializeStruct = StructSerializer<'a, W>;
+    type SerializeStructVariant = Self::SerializeMap;
 
     #[inline]
     fn serialize_bool(self, value: bool) -> Result<()> {
@@ -390,11 +451,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     #[inline]
     fn serialize_struct(self, name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
         // TODO: Use definition + object replace map
-        self.ser.write_map_start(Some(name))?;
-        Ok(MapSerializer {
-            name: Some(name),
-            ser: self,
-        })
+        Ok(StructSerializer::new(name, self))
     }
 
     #[inline]
@@ -451,6 +508,28 @@ mod test {
 
     #[test]
     fn test_struct() {
+        {
+            #[derive(Serialize)]
+            #[serde(rename = "example.Car")]
+            struct Car {
+                color: String,
+                model: String,
+            }
+            let output = to_vec(&Car {
+                color: "red".to_string(),
+                model: "Ferrari".to_string(),
+            })
+            .unwrap();
+            assert_eq!(
+                output,
+                &[
+                    b'C', 0x0b, b'e', b'x', b'a', b'm', b'p', b'l', b'e', b'.', b'C', b'a', b'r',
+                    0x92, 0x05, b'c', b'o', b'l', b'o', b'r', 0x05, b'm', b'o', b'd', b'e', b'l',
+                    b'O', 0x90, 0x03, b'r', b'e', b'd', 0x07, b'F', b'e', b'r', b'r', b'a', b'r',
+                    b'i',
+                ]
+            );
+        }
         #[derive(Serialize)]
         struct Test {
             int: u32,
@@ -465,8 +544,8 @@ mod test {
         assert_eq!(
             output,
             &[
-                b'M', 0x04, b'T', b'e', b's', b't', 0x03, b'i', b'n', b't', 0x91, 0x03, b's', b'e',
-                b'q', 0x7a, 0x01, b'a', 0x01, b'b', b'Z'
+                b'C', 0x04, b'T', b'e', b's', b't', 0x92, 0x03, b'i', b'n', b't', 0x03, b's', b'e',
+                b'q', b'O', 0x90, 0x91, 0x7a, 0x01, b'a', 0x01, b'b'
             ]
         )
     }

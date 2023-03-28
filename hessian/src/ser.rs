@@ -66,6 +66,11 @@ impl<W: io::Write> Serializer<W> {
         }
     }
 
+    pub fn extend_from_slice(&mut self, slice: &[u8]) -> Result<()> {
+        self.writer.write_all(slice)?;
+        Ok(())
+    }
+
     pub fn serialize_value(&mut self, value: &Value) -> Result<()> {
         match *value {
             Value::Int(i) => self.serialize_int(i),
@@ -82,21 +87,29 @@ impl<W: io::Write> Serializer<W> {
         }
     }
 
+    #[inline]
     pub fn get_definition(&self, name: &str) -> Option<&Definition> {
         self.classes_cache.get(name)
     }
 
+    #[inline]
     pub fn serialize_fields_with_definition(
         &mut self,
         def: &Definition,
         fields: &[Value],
     ) -> Result<()> {
-        let ref_num = self.write_definition(def)?;
-        self.writer.write_u8(b'O')?;
-        self.serialize_int(ref_num as i32)?;
+        self.write_object_start(def)?;
         for value in fields.iter() {
             self.serialize_value(value)?;
         }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn write_object_start(&mut self, def: &Definition) -> Result<()> {
+        let ref_num = self.write_definition(def)?;
+        self.writer.write_u8(b'O')?;
+        self.serialize_int(ref_num as i32)?;
         Ok(())
     }
 
