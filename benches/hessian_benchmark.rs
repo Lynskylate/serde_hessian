@@ -1,6 +1,4 @@
-use criterion::{
-    black_box, criterion_group, criterion_main, Benchmark, BenchmarkGroup, Criterion, Throughput,
-};
+use criterion::{black_box, criterion_group, criterion_main, Criterion, Throughput};
 use hessian_rs::{from_slice, to_vec};
 
 static INPUT: &[u8] = include_bytes!("../tests/fixtures/map/custom_map_type.bin");

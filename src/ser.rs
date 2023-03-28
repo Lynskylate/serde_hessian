@@ -361,7 +361,7 @@ mod tests {
 
     #[test]
     fn test_encode_int() {
-        test_encode_ok(Int(0), &[0x90 as u8]);
+        test_encode_ok(Int(0), &[0x90_u8]);
         test_encode_ok(Int(-16), &[0x80]);
         test_encode_ok(Int(47), &[0xbf]);
         test_encode_ok(Int(48), &[0xc8, 0x30]);
@@ -382,7 +382,7 @@ mod tests {
         test_encode_ok(Value::String(String::new()), &[0x00]);
         test_encode_ok(
             Value::String(vec!['a'; 0x1f].into_iter().collect()),
-            &[&[0x1f as u8], vec!['a' as u8; 0x1f].as_slice()].concat(),
+            &[&[0x1f_u8], vec![b'a'; 0x1f].as_slice()].concat(),
         );
     }
 
@@ -446,11 +446,11 @@ mod tests {
     fn test_encode_type() {
         let mut buf = Vec::new();
         let mut ser = Serializer::new(&mut buf);
-        let first_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
+        let first_list = value::List::from(("[int".to_string(), vec![Value::Int(1)]));
         ser.serialize_list(&first_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
         assert_eq!(ser.type_cache.get_index_of("[int"), Some(0));
-        let second_list = value::List::from(("[int".to_string(), vec![Value::Int(1).into()]));
+        let second_list = value::List::from(("[int".to_string(), vec![Value::Int(1)]));
         ser.serialize_list(&second_list).unwrap();
         assert_eq!(ser.type_cache.len(), 1);
     }
@@ -480,7 +480,7 @@ mod tests {
         };
         let obj = Object {
             definition: &def,
-            fields: vec![Value::String("red".to_string()).into()],
+            fields: vec![Value::String("red".to_string())],
         };
 
         let mut buf = Vec::new();
