@@ -1,11 +1,16 @@
-use hessian_rs::{ser::Serializer as ValueSerializer, value::{List, Map}};
-use std::io;
-use serde::{ser, Serialize};
 use crate::error::Error;
-
+use hessian_rs::{
+    ser::Serializer as ValueSerializer,
+    value::{List, Map},
+};
+use serde::ser::SerializeMap;
+use serde::ser::SerializeSeq;
+use serde::ser::SerializeStruct;
+use serde::ser::SerializeStructVariant;
+use serde::{ser, Serialize};
+use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
-
 
 pub struct Serializer<W: io::Write> {
     ser: ValueSerializer<W>,
@@ -26,21 +31,21 @@ pub struct StructSerializer<W: io::Write> {
 
 pub struct MapSerializer<'a, W: io::Write> {
     name: Option<&'static str>,
-    ser: &'a mut Serializer<W>
+    ser: &'a mut Serializer<W>,
 }
 
 pub struct ListSerializer<'a, W: io::Write> {
-    ser: &'a mut Serializer<W>
+    ser: &'a mut Serializer<W>,
+    sized: bool,
 }
 
-
-impl<'a, W: io::Write> ser::SerializeSeq for &'a mut ListSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeSeq for ListSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
     #[inline]
     fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
-        value.serialize(self.ser)?;
+        value.serialize(&mut *self.ser)?;
         Ok(())
     }
 
@@ -50,13 +55,13 @@ impl<'a, W: io::Write> ser::SerializeSeq for &'a mut ListSerializer<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeTuple for &'a mut ListSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeTuple for ListSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
     #[inline]
     fn serialize_element<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
-        value.serialize(self.ser)?;
+        value.serialize(&mut *self.ser)?;
         Ok(())
     }
 
@@ -66,7 +71,7 @@ impl<'a, W: io::Write> ser::SerializeTuple for &'a mut ListSerializer<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeTupleStruct for &'a mut ListSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeTupleStruct for ListSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
@@ -81,7 +86,7 @@ impl<'a, W: io::Write> ser::SerializeTupleStruct for &'a mut ListSerializer<'a, 
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeTupleVariant for &'a mut ListSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeTupleVariant for ListSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
@@ -96,29 +101,42 @@ impl<'a, W: io::Write> ser::SerializeTupleVariant for &'a mut ListSerializer<'a,
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeMap for &'a mut MapSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeMap for MapSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
     #[inline]
     fn serialize_key<T: Serialize + ?Sized>(&mut self, key: &T) -> Result<()> {
-        key.serialize(self.ser)
+        key.serialize(&mut *self.ser)
     }
 
     #[inline]
     fn serialize_value<T: Serialize + ?Sized>(&mut self, value: &T) -> Result<()> {
-        value.serialize(self.ser)
+        value.serialize(&mut *self.ser)
     }
 
     #[inline]
-    fn end(mut self) -> Result<()> {
+    fn serialize_entry<K: ?Sized, V: ?Sized>(
+        &mut self,
+        key: &K,
+        value: &V,
+    ) -> std::result::Result<(), Self::Error>
+    where
+        K: Serialize,
+        V: Serialize,
+    {
+        key.serialize(&mut *self.ser)?;
+        value.serialize(&mut *self.ser)
+    }
+
+    #[inline]
+    fn end(self) -> Result<()> {
         self.ser.ser.write_object_end()?;
         Ok(())
     }
 }
 
-
-impl<'a, W: io::Write> ser::SerializeStruct for &'a mut MapSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeStruct for MapSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
@@ -138,7 +156,7 @@ impl<'a, W: io::Write> ser::SerializeStruct for &'a mut MapSerializer<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::SerializeStructVariant for &'a mut MapSerializer<'a, W> {
+impl<'a, W: io::Write> ser::SerializeStructVariant for MapSerializer<'a, W> {
     type Ok = ();
     type Error = Error;
 
@@ -158,8 +176,6 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for &'a mut MapSerializer<'a,
         Ok(())
     }
 }
-
-
 
 impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     type Ok = ();
@@ -319,16 +335,18 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         match len {
             Some(len) => {
                 self.ser.write_list_begin(len, None)?;
-                Ok(ListSerializer { ser: self })
+                Ok(ListSerializer { ser: self, sized: true })
             }
-            _ => Ok(ListSerializer { ser: self }),
+            None => {
+                Ok(ListSerializer { ser: self, sized: false})
+            }
         }
     }
 
     #[inline]
     fn serialize_tuple(mut self, len: usize) -> Result<Self::SerializeTuple> {
         self.ser.write_list_begin(len, None)?;
-        Ok(ListSerializer { ser: self })
+        Ok(ListSerializer { ser: self, sized: true })
     }
 
     #[inline]
@@ -338,7 +356,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         len: usize,
     ) -> Result<Self::SerializeTupleStruct> {
         self.ser.write_list_begin(len, Some(name))?;
-        Ok(ListSerializer { ser: self })
+        Ok(ListSerializer { ser: self, sized: true})
     }
 
     #[inline]
@@ -350,20 +368,26 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
         self.ser.write_list_begin(len, Some(variant))?;
-        Ok(ListSerializer { ser: self })
+        Ok(ListSerializer { ser: self , sized: true})
     }
 
     #[inline]
     fn serialize_map(mut self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         self.ser.write_map_start(None)?;
-        Ok(MapSerializer { name: None, ser: self })
+        Ok(MapSerializer {
+            name: None,
+            ser: self,
+        })
     }
 
     #[inline]
     fn serialize_struct(self, name: &'static str, _len: usize) -> Result<Self::SerializeStruct> {
         // TODO: Use definition + object replace map
         self.ser.write_map_start(Some(name))?;
-        Ok(MapSerializer { name: Some(name), ser: self })
+        Ok(MapSerializer {
+            name: Some(name),
+            ser: self,
+        })
     }
 
     #[inline]
@@ -375,14 +399,102 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
         self.ser.write_map_start(Some(variant))?;
-        Ok(MapSerializer { name: Some(name), ser: self })
+        Ok(MapSerializer {
+            name: Some(name),
+            ser: self,
+        })
     }
+
+    fn serialize_i128(self, v: i128) -> std::result::Result<Self::Ok, Self::Error> {
+        let _ = v;
+        Err(ser::Error::custom("i128 is not supported"))
+    }
+
+    fn serialize_u128(self, v: u128) -> std::result::Result<Self::Ok, Self::Error> {
+        let _ = v;
+        Err(ser::Error::custom("u128 is not supported"))
+    }
+
+    fn collect_str<T: ?Sized>(self, value: &T) -> std::result::Result<Self::Ok, Self::Error>
+    where
+        T: std::fmt::Display,
+    {
+        self.serialize_str(&value.to_string())
+    }
+
+    fn is_human_readable(&self) -> bool {
+        false
+    }
+
+
+
+}
+
+pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
+where
+    T: Serialize,
+{
+    let mut buf = Vec::new();
+    let mut ser = Serializer::new(&mut buf);
+    value.serialize(&mut ser)?;
+    Ok(buf)
 }
 
 #[cfg(test)]
 mod test {
+    use serde::Serialize;
+    use crate::ser::to_vec;
 
     #[test]
-    fn test_serialize_seq() {
+    fn test_struct() {
+        #[derive(Serialize)]
+        struct Test {
+            int: u32,
+            seq: Vec<&'static str>,
+        }
+
+        let test = Test {
+            int: 1,
+            seq: vec!["a", "b"],
+        };
+        let output = to_vec(&test).unwrap();
+        assert_eq!(
+            output,
+            &[
+                b'M', 0x04, b'T', b'e', b's', b't', 0x03, b'i', b'n', b't', 0x91, 0x03, b's', b'e',
+                b'q', 0x7a, 0x01, b'a', 0x01, b'b', b'Z'
+            ]
+        )
+    }
+    #[test]
+    fn test_enum() {
+        #[derive(Serialize)]
+        enum E {
+            Unit,
+            Newtype(u32),
+            Tuple(u32, u32),
+            Struct { a: u32 },
+        }
+
+        let u = E::Unit;
+        let expected = b"\x04Unit";
+        assert_eq!(to_vec(&u).unwrap(), expected);
+
+        let n = E::Newtype(1);
+        assert_eq!(to_vec(&n).unwrap(), &[0x91]);
+
+        // serialize tuple variant, use variant as list name
+        let t = E::Tuple(1, 2);
+        assert_eq!(
+            to_vec(&t).unwrap(),
+            &[0x72, 0x05, b'T', b'u', b'p', b'l', b'e', 0x91, 0x92]
+        );
+
+        // serialize Variant Struct, use variant naeme as map name
+        let s = E::Struct { a: 1 };
+        assert_eq!(
+            to_vec(&s).unwrap(),
+            &[b'M', 0x06, b'S', b't', b'r', b'u', b'c', b't', 0x01, b'a', 0x91, b'Z']
+        );
     }
 }

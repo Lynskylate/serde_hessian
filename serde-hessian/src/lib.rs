@@ -1,2 +1,2 @@
-pub mod ser;
 mod error;
+pub mod ser;

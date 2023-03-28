@@ -1,12 +1,11 @@
+use hessian_rs::Error as HessianError;
+use hessian_rs::ErrorKind;
+use std::error::Error as StdError;
 use std::result;
 use std::string::FromUtf8Error;
 use std::{fmt, io};
-use std::error::Error as StdError;
-use hessian_rs::Error as HessianError;
-use hessian_rs::ErrorKind;
 
 use serde::ser::Error as SerError;
-
 
 #[derive(Debug)]
 pub enum Error {
@@ -46,8 +45,6 @@ impl From<FromUtf8Error> for Error {
         Error::FromUtf8Error(error)
     }
 }
-
-
 
 impl SerError for Error {
     fn custom<T: fmt::Display>(msg: T) -> Self {
