@@ -459,6 +459,14 @@ dependencies = [
 ]
 
 [[package]]
+name = "serde-hessian"
+version = "0.1.0-rc1"
+dependencies = [
+ "hessian_rs",
+ "serde",
+]
+
+[[package]]
 name = "serde_derive"
 version = "1.0.159"
 source = "registry+https://github.com/rust-lang/crates.io-index"

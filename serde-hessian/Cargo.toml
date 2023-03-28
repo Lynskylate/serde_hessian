@@ -1,0 +1,21 @@
+[package]
+name = "serde-hessian"
+version = "0.1.0-rc1"
+authors = ["lynskylate <lynskylate@gmail.com>"]
+edition = "2018"
+keywords = ["serialization", "hessian2", "serde"]
+categories = ["encoding", "serde"]
+description = "hessian2 codec implemention"
+license = "GPL-3.0-or-later"
+homepage = "https://github.com/Lynskylate/serde_hessian"
+repository = "https://github.com/Lynskylate/serde_hessian.git"
+
+[dependencies]
+serde = { version = "1.0" }
+
+
+[dependencies.hessian_rs]
+path = "../hessian"
+
+[dev-dependencies]
+serde = { version = "1.0", features = ["derive"]}
