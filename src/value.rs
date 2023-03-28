@@ -635,8 +635,8 @@ mod tests {
                 m
             };
             let v = map.to_hessian();
-            assert!(v.to_string().find("\"a\" : 1,").is_some());
-            assert!(v.to_string().find("\"b\" : 2,").is_some());
+            assert!(v.to_string().contains("\"a\" : 1,"));
+            assert!(v.to_string().contains("\"b\" : 2,"));
         }
     }
 }

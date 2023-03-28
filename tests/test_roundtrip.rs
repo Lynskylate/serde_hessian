@@ -10,11 +10,11 @@ fn roundtrip_test(val: Value) {
     let mut encoded = Vec::new();
     let mut ser = Serializer::new(&mut encoded);
     ser.serialize_value(&val)
-        .expect(&format!("serialization failed for {:?}", val));
+        .unwrap_or_else(|_| panic!("serialization failed for {:?}", val));
     let mut de = Deserializer::new(&encoded);
     let decoded = de
         .read_value()
-        .expect(&format!("deserialization failed for {:?}", val));
+        .unwrap_or_else(|_| panic!("deserialization failed for {:?}", val));
     assert_eq!(decoded, val);
 }
 

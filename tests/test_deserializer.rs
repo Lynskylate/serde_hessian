@@ -105,7 +105,6 @@ fn test_decode_list() {
                     .into_iter()
                     .map(|x| x.into())
                     .collect::<Vec<Value>>()
-                    .into()
             )
                 .into()
         )
