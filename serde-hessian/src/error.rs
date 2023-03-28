@@ -1,7 +1,7 @@
 use hessian_rs::Error as HessianError;
 use hessian_rs::ErrorKind;
 use std::error::Error as StdError;
-use std::result;
+
 use std::string::FromUtf8Error;
 use std::{fmt, io};
 

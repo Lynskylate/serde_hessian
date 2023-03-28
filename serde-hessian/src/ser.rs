@@ -1,12 +1,6 @@
 use crate::error::Error;
-use hessian_rs::{
-    ser::Serializer as ValueSerializer,
-    value::{List, Map},
-};
-use serde::ser::SerializeMap;
-use serde::ser::SerializeSeq;
-use serde::ser::SerializeStruct;
-use serde::ser::SerializeStructVariant;
+use hessian_rs::ser::Serializer as ValueSerializer;
+
 use serde::{ser, Serialize};
 use std::io;
 
@@ -150,7 +144,7 @@ impl<'a, W: io::Write> ser::SerializeStruct for MapSerializer<'a, W> {
     }
 
     #[inline]
-    fn end(mut self) -> Result<()> {
+    fn end(self) -> Result<()> {
         self.ser.ser.write_object_end()?;
         Ok(())
     }
@@ -171,7 +165,7 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for MapSerializer<'a, W> {
     }
 
     #[inline]
-    fn end(mut self) -> Result<()> {
+    fn end(self) -> Result<()> {
         self.ser.ser.write_object_end()?;
         Ok(())
     }
@@ -190,49 +184,49 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     type SerializeStructVariant = Self::SerializeStruct;
 
     #[inline]
-    fn serialize_bool(mut self, value: bool) -> Result<()> {
+    fn serialize_bool(self, value: bool) -> Result<()> {
         self.ser.serialize_bool(value)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_i8(mut self, value: i8) -> Result<()> {
+    fn serialize_i8(self, value: i8) -> Result<()> {
         self.ser.serialize_int(value as i32)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_i16(mut self, value: i16) -> Result<()> {
+    fn serialize_i16(self, value: i16) -> Result<()> {
         self.ser.serialize_int(value as i32)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_i32(mut self, value: i32) -> Result<()> {
+    fn serialize_i32(self, value: i32) -> Result<()> {
         self.ser.serialize_int(value)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_i64(mut self, value: i64) -> Result<()> {
+    fn serialize_i64(self, value: i64) -> Result<()> {
         self.ser.serialize_long(value)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_u8(mut self, value: u8) -> Result<()> {
+    fn serialize_u8(self, value: u8) -> Result<()> {
         self.ser.serialize_int(value as i32)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_u16(mut self, value: u16) -> Result<()> {
+    fn serialize_u16(self, value: u16) -> Result<()> {
         self.ser.serialize_int(value as i32)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_u32(mut self, value: u32) -> Result<()> {
+    fn serialize_u32(self, value: u32) -> Result<()> {
         if value < i32::max_value() as u32 {
             self.ser.serialize_int(value as i32)?;
         } else {
@@ -242,20 +236,20 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     #[inline]
-    fn serialize_u64(mut self, value: u64) -> Result<()> {
+    fn serialize_u64(self, value: u64) -> Result<()> {
         self.ser.serialize_long(value as i64)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_f32(mut self, value: f32) -> Result<()> {
+    fn serialize_f32(self, value: f32) -> Result<()> {
         self.ser.serialize_double(value as f64)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_f64(mut self, value: f64) -> Result<()> {
-        self.ser.serialize_double(value as f64)?;
+    fn serialize_f64(self, value: f64) -> Result<()> {
+        self.ser.serialize_double(value)?;
         Ok(())
     }
 
@@ -267,25 +261,25 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     #[inline]
-    fn serialize_str(mut self, value: &str) -> Result<()> {
+    fn serialize_str(self, value: &str) -> Result<()> {
         self.ser.serialize_string(value)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_bytes(mut self, value: &[u8]) -> Result<()> {
+    fn serialize_bytes(self, value: &[u8]) -> Result<()> {
         self.ser.serialize_binary(value)?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_unit(mut self) -> Result<()> {
+    fn serialize_unit(self) -> Result<()> {
         self.ser.serialize_null()?;
         Ok(())
     }
 
     #[inline]
-    fn serialize_unit_struct(mut self, _name: &'static str) -> Result<()> {
+    fn serialize_unit_struct(self, _name: &'static str) -> Result<()> {
         self.ser.serialize_null()?;
         Ok(())
     }
@@ -331,48 +325,61 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     }
 
     #[inline]
-    fn serialize_seq(mut self, len: Option<usize>) -> Result<Self::SerializeSeq> {
+    fn serialize_seq(self, len: Option<usize>) -> Result<Self::SerializeSeq> {
         match len {
             Some(len) => {
                 self.ser.write_list_begin(len, None)?;
-                Ok(ListSerializer { ser: self, sized: true })
+                Ok(ListSerializer {
+                    ser: self,
+                    sized: true,
+                })
             }
-            None => {
-                Ok(ListSerializer { ser: self, sized: false})
-            }
+            None => Ok(ListSerializer {
+                ser: self,
+                sized: false,
+            }),
         }
     }
 
     #[inline]
-    fn serialize_tuple(mut self, len: usize) -> Result<Self::SerializeTuple> {
+    fn serialize_tuple(self, len: usize) -> Result<Self::SerializeTuple> {
         self.ser.write_list_begin(len, None)?;
-        Ok(ListSerializer { ser: self, sized: true })
+        Ok(ListSerializer {
+            ser: self,
+            sized: true,
+        })
     }
 
     #[inline]
     fn serialize_tuple_struct(
-        mut self,
+        self,
         name: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleStruct> {
         self.ser.write_list_begin(len, Some(name))?;
-        Ok(ListSerializer { ser: self, sized: true})
+        Ok(ListSerializer {
+            ser: self,
+            sized: true,
+        })
     }
 
     #[inline]
     fn serialize_tuple_variant(
-        mut self,
+        self,
         _name: &'static str,
         _variant_index: u32,
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
         self.ser.write_list_begin(len, Some(variant))?;
-        Ok(ListSerializer { ser: self , sized: true})
+        Ok(ListSerializer {
+            ser: self,
+            sized: true,
+        })
     }
 
     #[inline]
-    fn serialize_map(mut self, _len: Option<usize>) -> Result<Self::SerializeMap> {
+    fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         self.ser.write_map_start(None)?;
         Ok(MapSerializer {
             name: None,
@@ -392,7 +399,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
 
     #[inline]
     fn serialize_struct_variant(
-        mut self,
+        self,
         name: &'static str,
         _variant_index: u32,
         variant: &'static str,
@@ -425,9 +432,6 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     fn is_human_readable(&self) -> bool {
         false
     }
-
-
-
 }
 
 pub fn to_vec<T>(value: &T) -> Result<Vec<u8>>
@@ -442,8 +446,8 @@ where
 
 #[cfg(test)]
 mod test {
-    use serde::Serialize;
     use crate::ser::to_vec;
+    use serde::Serialize;
 
     #[test]
     fn test_struct() {

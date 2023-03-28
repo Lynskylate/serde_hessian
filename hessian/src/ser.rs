@@ -89,7 +89,7 @@ impl<W: io::Write> Serializer<W> {
     pub fn serialize_fields_with_definition(
         &mut self,
         def: &Definition,
-        fields: &Vec<Value>,
+        fields: &[Value],
     ) -> Result<()> {
         let ref_num = self.write_definition(def)?;
         self.writer.write_u8(b'O')?;
