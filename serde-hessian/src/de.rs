@@ -5,7 +5,7 @@ use hessian_rs::{de::Deserializer as HessianDecoder, ByteCodecType};
 use crate::error::Error;
 use hessian_rs::constant::List as ListType;
 use hessian_rs::Value;
-use serde::de::{self, Visitor, IntoDeserializer};
+use serde::de::{self, IntoDeserializer, Visitor};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     de: HessianDecoder<R>,
@@ -40,7 +40,8 @@ impl<'de, 'a, R: AsRef<[u8]>> de::EnumAccess<'de> for EnumAccess<'a, R> {
 
     fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
     where
-        V: de::DeserializeSeed<'de> {
+        V: de::DeserializeSeed<'de>,
+    {
         let val = seed.deserialize(&mut *self.de)?;
         Ok((val, self))
     }
@@ -247,11 +248,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_i32(v as i32),
             hessian_rs::Value::Double(v) => visitor.visit_i32(v as i32),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize i32 expect a i32 value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize i32 expect a i32 value, but get {}", v),
             ))),
         }
     }
@@ -265,11 +262,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_i64(v),
             hessian_rs::Value::Double(v) => visitor.visit_i64(v as i64),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize i64 expect a i64 value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize i64 expect a i64 value, but get {}", v),
             ))),
         }
     }
@@ -289,19 +282,14 @@ where
                         format!(
                             "deserialize u8 expect a u8 value, but get bytes, size is {}",
                             b.len()
-                        )
-                        .into(),
+                        ),
                     )))
                 } else {
                     visitor.visit_char(b[0] as char)
                 }
             }
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize u8 expect a int/long value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize u8 expect a int/long value, but get {}", v),
             ))),
         }
     }
@@ -315,11 +303,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_u16(v as u16),
             hessian_rs::Value::Double(v) => visitor.visit_u16(v as u16),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize u16 expect a int/long value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize u16 expect a int/long value, but get {}", v),
             ))),
         }
     }
@@ -333,11 +317,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_u32(v as u32),
             hessian_rs::Value::Double(v) => visitor.visit_u32(v as u32),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize u32 expect a int/long value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize u32 expect a int/long value, but get {}", v),
             ))),
         }
     }
@@ -351,11 +331,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_u64(v as u64),
             hessian_rs::Value::Double(v) => visitor.visit_u64(v as u64),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize u64 expect a int/long value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize u64 expect a int/long value, but get {}", v),
             ))),
         }
     }
@@ -369,11 +345,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_f32(v as f32),
             hessian_rs::Value::Double(v) => visitor.visit_f32(v as f32),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize f32 expect a int/long value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize f32 expect a int/long value, but get {}", v),
             ))),
         }
     }
@@ -387,11 +359,7 @@ where
             hessian_rs::Value::Long(v) => visitor.visit_f64(v as f64),
             hessian_rs::Value::Double(v) => visitor.visit_f64(v),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize f64 expect a int/long value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize f64 expect a int/long value, but get {}", v),
             ))),
         }
     }
@@ -407,8 +375,7 @@ where
                         format!(
                             "deserialize char expect a char value, but get bytes, size is {}",
                             b.len()
-                        )
-                        .into(),
+                        ),
                     )))
                 } else {
                     visitor.visit_char(b[0] as char)
@@ -419,11 +386,7 @@ where
                     visitor.visit_char(v as u8 as char)
                 } else {
                     Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                        format!(
-                            "deserialize char expect a char value, but get {}",
-                            v.to_string()
-                        )
-                        .into(),
+                        format!("deserialize char expect a char value, but get {}", v),
                     )))
                 }
             }
@@ -432,20 +395,12 @@ where
                     visitor.visit_char(v as u8 as char)
                 } else {
                     Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                        format!(
-                            "deserialize char expect a char value, but get {}",
-                            v.to_string()
-                        )
-                        .into(),
+                        format!("deserialize char expect a char value, but get {}", v),
                     )))
                 }
             }
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize char expect a char value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize char expect a char value, but get {}", v),
             ))),
         }
     }
@@ -461,11 +416,7 @@ where
             }
             hessian_rs::Value::String(s) => visitor.visit_str(&s),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize str expect a string value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize str expect a string value, but get {}", v),
             ))),
         }
     }
@@ -481,11 +432,7 @@ where
             }
             hessian_rs::Value::String(s) => visitor.visit_string(s),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize string expect a string value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize string expect a string value, but get {}", v),
             ))),
         }
     }
@@ -497,11 +444,7 @@ where
         match self.de.read_value()? {
             hessian_rs::Value::Bytes(b) => visitor.visit_bytes(&b),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize bytes expect a bytes value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize bytes expect a bytes value, but get {}", v),
             ))),
         }
     }
@@ -513,11 +456,7 @@ where
         match self.de.read_value()? {
             hessian_rs::Value::Bytes(b) => visitor.visit_byte_buf(b),
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize byte_buf expect a bytes value, but get {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize byte_buf expect a bytes value, but get {}", v),
             ))),
         }
     }
@@ -545,18 +484,14 @@ where
                 visitor.visit_unit()
             }
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                format!(
-                    "deserialize unit expect a null tag, but get tag {}",
-                    v.to_string()
-                )
-                .into(),
+                format!("deserialize unit expect a null tag, but get tag {}", v),
             ))),
         }
     }
 
     fn deserialize_unit_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -567,7 +502,7 @@ where
 
     fn deserialize_newtype_struct<V>(
         self,
-        name: &'static str,
+        _name: &'static str,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -592,11 +527,7 @@ where
                     Value::Int(l) => l as usize,
                     v => {
                         return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                            format!(
-                                "deserialize seq length expect a int value, but get {}",
-                                v.to_string()
-                            )
-                            .into(),
+                            format!("deserialize seq length expect a int value, but get {}", v),
                         )))
                     }
                 };
@@ -621,14 +552,13 @@ where
             v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
                 format!(
                     "deserialize seq expect a list or map tag, but get tag {}",
-                    v.to_string()
-                )
-                .into(),
+                    v
+                ),
             ))),
         }
     }
 
-    fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    fn deserialize_tuple<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
@@ -637,8 +567,8 @@ where
 
     fn deserialize_tuple_struct<V>(
         self,
-        name: &'static str,
-        len: usize,
+        _name: &'static str,
+        _len: usize,
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -661,15 +591,9 @@ where
                 };
                 visitor.visit_map(MapAccess::new(self, type_name))
             }
-            v => {
-                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                    format!(
-                        "deserialize map expect a map tag, but get tag {}",
-                        v.to_string()
-                    )
-                    .into(),
-                )))
-            }
+            v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                format!("deserialize map expect a map tag, but get tag {}", v),
+            ))),
         }
     }
 
@@ -691,32 +615,26 @@ where
                     None
                 };
                 visitor.visit_map(MapAccess::new(self, type_name))
-            },
+            }
             ByteCodecType::Definition => {
                 self.de.read_definition()?;
                 self.deserialize_struct(name, fields, visitor)
-            },
+            }
             ByteCodecType::Object(o) => {
                 // todo: check object type and fields
                 let def_len = self.de.read_definition_id(o)?.fields.len();
                 visitor.visit_seq(SeqAccess::new(self, None, Some(def_len)))
-            },
-            v => {
-                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                    format!(
-                        "deserialize map expect a map tag, but get tag {}",
-                        v.to_string()
-                    )
-                    .into(),
-                )))
             }
+            v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                format!("deserialize map expect a map tag, but get tag {}", v),
+            ))),
         }
     }
 
     fn deserialize_enum<V>(
         self,
-        name: &'static str,
-        variants: &'static [&'static str],
+        _name: &'static str,
+        _variants: &'static [&'static str],
         visitor: V,
     ) -> Result<V::Value, Self::Error>
     where
@@ -725,7 +643,7 @@ where
         let tag = self.de.peek_byte()?;
         match ByteCodecType::from(tag) {
             ByteCodecType::String(_) => {
-                let value = self.de.read_value()?.clone();
+                let value = self.de.read_value()?;
                 visitor.visit_enum(value.as_str().unwrap().into_deserializer())
             }
             ByteCodecType::Map(typed) => {
@@ -734,16 +652,10 @@ where
                     self.de.read_type()?;
                 }
                 visitor.visit_enum(EnumAccess::new(self))
-            },
-            v => {
-                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
-                    format!(
-                        "deserialize enum can't support tag {}",
-                        v.to_string()
-                    )
-                    .into(),
-                )))
             }
+            v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                format!("deserialize enum can't support tag {}", v),
+            ))),
         }
     }
 
@@ -775,10 +687,10 @@ where
 
 #[cfg(test)]
 mod tests {
+    use crate::de::from_bytes;
     use crate::de::Deserializer;
     use serde::Deserialize;
     use std::collections::HashMap;
-    use crate::de::from_bytes;
 
     fn test_decode_ok<'a, T>(rdr: &[u8], target: T)
     where
@@ -799,16 +711,16 @@ mod tests {
 
         // BasicType i64
         {
-            test_decode_ok(&[0x59, 0x80, 0x00, 0x00, 0x00], -2147483648 as i64);
-            test_decode_ok(&[0x59, 0x7f, 0xff, 0xff, 0xff], 2147483647 as i64);
+            test_decode_ok(&[0x59, 0x80, 0x00, 0x00, 0x00], -2147483648_i64);
+            test_decode_ok(&[0x59, 0x7f, 0xff, 0xff, 0xff], 2147483647_i64);
 
-            test_decode_ok(&[0x59, 0x80, 0x00, 0x00, 0x00], -2147483648 as i32);
-            test_decode_ok(&[0x59, 0x7f, 0xff, 0xff, 0xff], 2147483647 as i32);
+            test_decode_ok(&[0x59, 0x80, 0x00, 0x00, 0x00], -2147483648_i32);
+            test_decode_ok(&[0x59, 0x7f, 0xff, 0xff, 0xff], 2147483647_i32);
         }
 
         // BasicType f32/f64
         {
-            test_decode_ok(&[0x5b], 0 as i32);
+            test_decode_ok(&[0x5b], 0_i32);
             test_decode_ok(&[0x5b], 0.0);
             test_decode_ok(&[0x5c], 1.0);
             test_decode_ok(&[0x5d, 0x80], -128.0);
@@ -882,9 +794,8 @@ mod tests {
         // deserialize struct from map
         test_decode_ok(
             &[
-                b'H', 0x05, b'C', b'o', b'l', b'o', b'r', 0x03, b'r', b'e', b'd',
-                0x05, b'M', b'o', b'd', b'e', b'l', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
-                b'Z'
+                b'H', 0x05, b'C', b'o', b'l', b'o', b'r', 0x03, b'r', b'e', b'd', 0x05, b'M', b'o',
+                b'd', b'e', b'l', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e', b'Z',
             ],
             car.clone(),
         );
@@ -911,9 +822,24 @@ mod tests {
         }
 
         test_decode_ok(&[0x04, b'U', b'n', b'i', b't'], E::Unit);
-        test_decode_ok(&[b'H', 0x07, b'N', b'e', b'w', b't', b'y', b'p', b'e', 0x91, b'Z'], E::Newtype(1));
-        test_decode_ok(&[b'H', 0x05, b'T', b'u', b'p', b'l', b'e', 0x57, 0x91, 0x91, b'Z'], E::Tuple(1, 1));
-        test_decode_ok(&[b'H', 0x06, b'S', b't', b'r', b'u', b'c', b't', b'H', 0x01, b'a', 0x91, b'Z', b'Z'], E::Struct{a: 1});
+        test_decode_ok(
+            &[
+                b'H', 0x07, b'N', b'e', b'w', b't', b'y', b'p', b'e', 0x91, b'Z',
+            ],
+            E::Newtype(1),
+        );
+        test_decode_ok(
+            &[
+                b'H', 0x05, b'T', b'u', b'p', b'l', b'e', 0x57, 0x91, 0x91, b'Z',
+            ],
+            E::Tuple(1, 1),
+        );
+        test_decode_ok(
+            &[
+                b'H', 0x06, b'S', b't', b'r', b'u', b'c', b't', b'H', 0x01, b'a', 0x91, b'Z', b'Z',
+            ],
+            E::Struct { a: 1 },
+        );
     }
 
     #[test]
@@ -927,6 +853,5 @@ mod tests {
             let t = Test::deserialize(&mut de).unwrap();
             assert_eq!(t.0, 1);
         }
-
     }
 }

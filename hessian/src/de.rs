@@ -93,7 +93,6 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(())
     }
 
-
     #[inline]
     pub fn read_definition_id(&mut self, tag: Object) -> Result<&Definition> {
         let ref_id = match tag {
@@ -106,10 +105,9 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
                 }
             }
         };
-        Ok(self
-            .class_references
+        self.class_references
             .get(ref_id)
-            .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(ref_id)))?)
+            .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(ref_id)))
     }
 
     /// Read an object from buffer
