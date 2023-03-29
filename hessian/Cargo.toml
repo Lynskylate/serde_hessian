@@ -1,6 +1,6 @@
 [package]
 name = "hessian_rs"
-version = "0.0.4-rc2"
+version = "0.0.4-rc3"
 authors = ["lynskylate <lynskylate@gmail.com>"]
 edition = "2018"
 exclude = ["tests/fixtures/**/*"]

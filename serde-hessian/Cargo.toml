@@ -16,6 +16,7 @@ serde = { version = "1.0" }
 
 [dependencies.hessian_rs]
 path = "../hessian"
+version = "0.0.4-rc3"
 
 [dev-dependencies]
 serde = { version = "1.0", features = ["derive"]}
