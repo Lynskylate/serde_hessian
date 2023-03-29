@@ -690,7 +690,7 @@ where
     }
 }
 
-pub fn from_bytes<'de, R, T>(read: R) -> Result<T, Error>
+pub fn from_slice<'de, R, T>(read: R) -> Result<T, Error>
 where
     R: AsRef<[u8]>,
     T: de::Deserialize<'de>,
@@ -703,7 +703,7 @@ where
 
 #[cfg(test)]
 mod tests {
-    use crate::de::from_bytes;
+    use crate::de::from_slice;
     use crate::de::Deserializer;
     use serde::Deserialize;
     use std::collections::HashMap;
@@ -712,7 +712,7 @@ mod tests {
     where
         T: Deserialize<'a> + std::cmp::PartialEq + std::fmt::Debug,
     {
-        let t: T = from_bytes(rdr).unwrap();
+        let t: T = from_slice(rdr).unwrap();
         assert_eq!(t, target);
     }
     #[test]
@@ -732,6 +732,15 @@ mod tests {
 
             test_decode_ok(&[0x59, 0x80, 0x00, 0x00, 0x00], -2147483648_i32);
             test_decode_ok(&[0x59, 0x7f, 0xff, 0xff, 0xff], 2147483647_i32);
+        }
+
+        // null
+        {
+            test_decode_ok(&[b'N'], ());
+        }
+
+        {
+            test_decode_ok(&[b'N'], None::<()>);
         }
 
         // BasicType f32/f64
@@ -767,6 +776,11 @@ mod tests {
             );
             //Untyped variable list
             test_decode_ok(&[0x57, 0x90, 0x91, b'Z'], vec![0, 1]);
+        }
+
+        {
+            test_decode_ok(&[b'T'], true);
+            test_decode_ok(&[b'F'], false);
         }
 
         {
