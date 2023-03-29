@@ -6,17 +6,17 @@ use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
 
-pub struct Encoder<W: io::Write>(ValueSerializer<W>);
+pub struct Serializer<W: io::Write>(ValueSerializer<W>);
 
-impl<W: io::Write> Encoder<W> {
+impl<W: io::Write> Serializer<W> {
     pub fn new(writer: W) -> Self {
-        Encoder(ValueSerializer::new(writer))
+        Serializer(ValueSerializer::new(writer))
     }
 }
 
 pub struct StructSerializer<'a, W: io::Write> {
     name: &'static str,
-    ser: &'a mut Encoder<W>,
+    ser: &'a mut Serializer<W>,
     fields: Vec<&'a str>,
     inx: usize,
     buf: Vec<u8>,
@@ -24,11 +24,11 @@ pub struct StructSerializer<'a, W: io::Write> {
 
 pub struct MapSerializer<'a, W: io::Write> {
     name: Option<&'static str>,
-    encoder: &'a mut Encoder<W>,
+    encoder: &'a mut Serializer<W>,
 }
 
 pub struct ListSerializer<'a, W: io::Write> {
-    ser: &'a mut Encoder<W>,
+    ser: &'a mut Serializer<W>,
     sized: bool,
 }
 
@@ -36,7 +36,7 @@ impl<'a, W> StructSerializer<'a, W>
 where
     W: io::Write,
 {
-    pub fn new(name: &'static str, ser: &'a mut Encoder<W>) -> Self {
+    pub fn new(name: &'static str, ser: &'a mut Serializer<W>) -> Self {
         StructSerializer {
             name,
             ser,
@@ -58,13 +58,13 @@ impl<'a, W: io::Write> ser::SerializeStruct for StructSerializer<'a, W> {
     ) -> Result<()> {
         if let Some(definition) = self.ser.0.get_definition(self.name) {
             if key != definition.fields[self.inx] {
-                return Err(Error::UnexpectedError("field name mismatch".to_string()));
+                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType("field name mismatch".to_string())));
             }
             self.inx += 1;
         } else {
             self.fields.push(key);
         }
-        value.serialize(&mut Encoder::new(&mut self.buf))?;
+        value.serialize(&mut Serializer::new(&mut self.buf))?;
         Ok(())
     }
 
@@ -228,7 +228,7 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for MapSerializer<'a, W> {
     }
 }
 
-impl<'a, W: io::Write> ser::Serializer for &'a mut Encoder<W> {
+impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     type Ok = ();
     type Error = Error;
 
@@ -492,7 +492,7 @@ where
     T: Serialize,
 {
     let mut buf = Vec::new();
-    let mut ser = Encoder::new(&mut buf);
+    let mut ser = Serializer::new(&mut buf);
     value.serialize(&mut ser)?;
     Ok(buf)
 }

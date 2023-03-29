@@ -58,6 +58,12 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(tag)
     }
 
+    #[inline]
+    pub fn peek_byte_code_type(&mut self) -> Result<ByteCodecType> {
+        let tag = self.peek_byte()?;
+        Ok(ByteCodecType::from(tag))
+    }
+
     fn read_definition(&mut self) -> Result<()> {
         // TODO(lynskylate@gmail.com): optimize error
         let name = match self.read_value() {
