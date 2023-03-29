@@ -1,4 +1,4 @@
-mod constant;
+pub mod constant;
 pub mod de;
 mod error;
 pub mod ser;

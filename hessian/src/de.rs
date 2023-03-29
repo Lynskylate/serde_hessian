@@ -30,7 +30,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     #[inline]
-    fn read_byte(&mut self) -> Result<u8> {
+    pub fn read_byte(&mut self) -> Result<u8> {
         Ok(self.buffer.read_u8()?)
     }
 
@@ -52,7 +52,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     #[inline]
-    fn peek_byte(&mut self) -> Result<u8> {
+    pub fn peek_byte(&mut self) -> Result<u8> {
         let tag = self.buffer.read_u8()?;
         self.buffer.seek(SeekFrom::Current(-1))?;
         Ok(tag)
@@ -496,7 +496,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     /// See http://hessian.caucho.com/doc/hessian-serialization.html##ref
     ///
-    fn read_type(&mut self) -> Result<String> {
+    pub fn read_type(&mut self) -> Result<String> {
         match self.read_value() {
             Ok(Value::String(s)) => {
                 self.type_references.push(s.clone());

@@ -1,10 +1,69 @@
+use std::fmt;
+
 use hessian_rs::{de::Deserializer as HessianDecoder, ByteCodecType};
 
 use crate::error::Error;
+use hessian_rs::constant::List as ListType;
+use hessian_rs::Value;
 use serde::de::{self, Visitor};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     de: HessianDecoder<R>,
+}
+
+struct SeqAccess<'a, R: AsRef<[u8]>> {
+    de: &'a mut Deserializer<R>,
+    name: Option<String>,
+    len: Option<usize>,
+    inx: usize,
+}
+
+impl<'a, R: AsRef<[u8]>> fmt::Display for SeqAccess<'a, R> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            format!(
+                "SeqAccess(class: {})",
+                self.name.clone().unwrap_or("None".into())
+            )
+        )
+    }
+}
+
+impl<'a, R: AsRef<[u8]>> SeqAccess<'a, R> {
+    fn new(de: &'a mut Deserializer<R>, name: Option<String>, len: Option<usize>) -> Self {
+        SeqAccess {
+            de,
+            name,
+            len,
+            inx: 0,
+        }
+    }
+}
+
+impl<'de, 'a, R: AsRef<[u8]>> de::SeqAccess<'de> for SeqAccess<'a, R> {
+    type Error = Error;
+
+    #[inline]
+    fn next_element_seed<T>(&mut self, seed: T) -> Result<Option<T::Value>, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        if self.len.is_none() && self.de.de.peek_byte()? == b'Z' {
+            return Ok(None);
+        } else if self.len.is_some() && self.len.unwrap() == self.inx {
+            return Ok(None);
+        }
+        let value = seed.deserialize(&mut *self.de)?;
+        self.inx += 1;
+        Ok(Some(value))
+    }
+
+    #[inline(always)]
+    fn size_hint(&self) -> Option<usize> {
+        self.len
+    }
 }
 
 impl<'de, R: AsRef<[u8]>> Deserializer<R> {
@@ -417,14 +476,59 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        let tag = self.de.read_byte()?;
+        match ByteCodecType::from(tag) {
+            ByteCodecType::List(ListType::FixedLength(typed)) => {
+                let type_name = if typed {
+                    Some(self.de.read_type()?)
+                } else {
+                    None
+                };
+                let length = match self.de.read_value()? {
+                    Value::Int(l) => l as usize,
+                    v => {
+                        return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                            format!(
+                                "deserialize seq length expect a int value, but get {}",
+                                v.to_string()
+                            )
+                            .into(),
+                        )))
+                    }
+                };
+                visitor.visit_seq(SeqAccess::new(self, type_name, Some(length)))
+            }
+            ByteCodecType::List(ListType::ShortFixedLength(typed, length)) => {
+                let type_name = if typed {
+                    Some(self.de.read_type()?)
+                } else {
+                    None
+                };
+                visitor.visit_seq(SeqAccess::new(self, type_name, Some(length)))
+            }
+            ByteCodecType::List(ListType::VarLength(typed)) => {
+                let type_name = if typed {
+                    Some(self.de.read_type()?)
+                } else {
+                    None
+                };
+                visitor.visit_seq(SeqAccess::new(self, type_name, None))
+            }
+            v => Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                format!(
+                    "deserialize seq expect a list or map tag, but get tag {}",
+                    v.to_string()
+                )
+                .into(),
+            ))),
+        }
     }
 
     fn deserialize_tuple<V>(self, len: usize, visitor: V) -> Result<V::Value, Self::Error>
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_seq(visitor)
     }
 
     fn deserialize_tuple_struct<V>(
@@ -436,7 +540,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_seq(visitor)
     }
 
     fn deserialize_map<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -474,7 +578,7 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_string(visitor)
     }
 
     fn deserialize_ignored_any<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -542,6 +646,15 @@ mod tests {
                 &[b'D', 0x40, 0x28, 0x80, 0x00, 0x00, 0x00, 0x00, 0x00],
                 12.25,
             );
+        }
+
+        {
+            test_decode_ok(
+                &[b'V', 0x04, b'[', b'i', b'n', b't', 0x92, 0x90, 0x91],
+                vec![0, 1],
+            );
+            //Untyped variable list
+            test_decode_ok(&[0x57, 0x90, 0x91, b'Z'], vec![0, 1]);
         }
     }
     #[test]
