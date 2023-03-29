@@ -5,10 +5,15 @@ use hessian_rs::{de::Deserializer as HessianDecoder, ByteCodecType};
 use crate::error::Error;
 use hessian_rs::constant::List as ListType;
 use hessian_rs::Value;
-use serde::de::{self, Visitor};
+use serde::de::{self, Visitor, IntoDeserializer};
 
 pub struct Deserializer<R: AsRef<[u8]>> {
     de: HessianDecoder<R>,
+}
+
+struct MapAccess<'a, R: AsRef<[u8]>> {
+    de: &'a mut Deserializer<R>,
+    name: Option<String>,
 }
 
 struct SeqAccess<'a, R: AsRef<[u8]>> {
@@ -16,6 +21,100 @@ struct SeqAccess<'a, R: AsRef<[u8]>> {
     name: Option<String>,
     len: Option<usize>,
     inx: usize,
+}
+
+struct EnumAccess<'a, R: AsRef<[u8]>> {
+    de: &'a mut Deserializer<R>,
+}
+
+impl<'a, R: AsRef<[u8]>> EnumAccess<'a, R> {
+    pub fn new(de: &'a mut Deserializer<R>) -> Self {
+        EnumAccess { de }
+    }
+}
+
+impl<'de, 'a, R: AsRef<[u8]>> de::EnumAccess<'de> for EnumAccess<'a, R> {
+    type Error = Error;
+
+    type Variant = Self;
+
+    fn variant_seed<V>(self, seed: V) -> Result<(V::Value, Self::Variant), Self::Error>
+    where
+        V: de::DeserializeSeed<'de> {
+        let val = seed.deserialize(&mut *self.de)?;
+        Ok((val, self))
+    }
+}
+
+impl<'de, 'a, R: AsRef<[u8]>> de::VariantAccess<'de> for EnumAccess<'a, R> {
+    type Error = Error;
+
+    // If the `Visitor` expected this variant to be a unit variant, the input
+    // should have been the plain string case handled in `deserialize_enum`.
+    fn unit_variant(self) -> Result<(), Self::Error> {
+        unreachable!("unit_variant")
+    }
+
+    // Newtype variants are represented in JSON as `{ NAME: VALUE }` so
+    // deserialize the value here.
+    fn newtype_variant_seed<T>(self, seed: T) -> Result<T::Value, Self::Error>
+    where
+        T: de::DeserializeSeed<'de>,
+    {
+        seed.deserialize(self.de)
+    }
+
+    // Tuple variants are represented in JSON as `{ NAME: [DATA...] }` so
+    // deserialize the sequence of data here.
+    fn tuple_variant<V>(self, _len: usize, visitor: V) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        de::Deserializer::deserialize_seq(self.de, visitor)
+    }
+
+    // Struct variants are represented in JSON as `{ NAME: { K: V, ... } }` so
+    // deserialize the inner map here.
+    fn struct_variant<V>(
+        self,
+        _fields: &'static [&'static str],
+        visitor: V,
+    ) -> Result<V::Value, Self::Error>
+    where
+        V: Visitor<'de>,
+    {
+        de::Deserializer::deserialize_map(self.de, visitor)
+    }
+}
+
+impl<'a, R: AsRef<[u8]>> MapAccess<'a, R> {
+    fn new(de: &'a mut Deserializer<R>, name: Option<String>) -> Self {
+        MapAccess { de, name }
+    }
+}
+
+impl<'de, 'a, R: AsRef<[u8]>> de::MapAccess<'de> for MapAccess<'a, R> {
+    type Error = Error;
+
+    fn next_key_seed<K>(&mut self, seed: K) -> Result<Option<K::Value>, Self::Error>
+    where
+        K: de::DeserializeSeed<'de>,
+    {
+        if self.de.de.peek_byte()? == b'Z' {
+            self.de.de.read_byte()?;
+            Ok(None)
+        } else {
+            Ok(Some(seed.deserialize(&mut *self.de)?))
+        }
+    }
+
+    fn next_value_seed<V>(&mut self, seed: V) -> Result<V::Value, Self::Error>
+    where
+        V: de::DeserializeSeed<'de>,
+    {
+        let v = seed.deserialize(&mut *self.de)?;
+        Ok(v)
+    }
 }
 
 impl<'a, R: AsRef<[u8]>> fmt::Display for SeqAccess<'a, R> {
@@ -52,7 +151,7 @@ impl<'de, 'a, R: AsRef<[u8]>> de::SeqAccess<'de> for SeqAccess<'a, R> {
     {
         if self.len.is_none() && self.de.de.peek_byte()? == b'Z' {
             return Ok(None);
-        } else if self.len.is_some() && self.len.unwrap() == self.inx {
+        } else if self.size_hint().is_some() && self.size_hint().unwrap() == 0 {
             return Ok(None);
         }
         let value = seed.deserialize(&mut *self.de)?;
@@ -62,7 +161,11 @@ impl<'de, 'a, R: AsRef<[u8]>> de::SeqAccess<'de> for SeqAccess<'a, R> {
 
     #[inline(always)]
     fn size_hint(&self) -> Option<usize> {
-        self.len
+        if self.len.is_some() {
+            Some(self.len.unwrap() - self.inx)
+        } else {
+            None
+        }
     }
 }
 
@@ -98,6 +201,7 @@ where
             hessian_rs::ByteCodecType::List(_) => self.deserialize_seq(visitor),
             hessian_rs::ByteCodecType::Map(_) => self.deserialize_map(visitor),
             hessian_rs::ByteCodecType::Definition => {
+                self.de.read_byte()?;
                 self.de.read_definition()?;
                 self.deserialize_any(visitor)
             }
@@ -547,7 +651,26 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        let tag = self.de.read_byte()?;
+        match ByteCodecType::from(tag) {
+            ByteCodecType::Map(typed) => {
+                let type_name = if typed {
+                    Some(self.de.read_type()?)
+                } else {
+                    None
+                };
+                visitor.visit_map(MapAccess::new(self, type_name))
+            }
+            v => {
+                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                    format!(
+                        "deserialize map expect a map tag, but get tag {}",
+                        v.to_string()
+                    )
+                    .into(),
+                )))
+            }
+        }
     }
 
     fn deserialize_struct<V>(
@@ -559,7 +682,35 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        let tag = self.de.read_byte()?;
+        match ByteCodecType::from(tag) {
+            ByteCodecType::Map(typed) => {
+                let type_name = if typed {
+                    Some(self.de.read_type()?)
+                } else {
+                    None
+                };
+                visitor.visit_map(MapAccess::new(self, type_name))
+            },
+            ByteCodecType::Definition => {
+                self.de.read_definition()?;
+                self.deserialize_struct(name, fields, visitor)
+            },
+            ByteCodecType::Object(o) => {
+                // todo: check object type and fields
+                let def_len = self.de.read_definition_id(o)?.fields.len();
+                visitor.visit_seq(SeqAccess::new(self, None, Some(def_len)))
+            },
+            v => {
+                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                    format!(
+                        "deserialize map expect a map tag, but get tag {}",
+                        v.to_string()
+                    )
+                    .into(),
+                )))
+            }
+        }
     }
 
     fn deserialize_enum<V>(
@@ -571,7 +722,29 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        let tag = self.de.peek_byte()?;
+        match ByteCodecType::from(tag) {
+            ByteCodecType::String(_) => {
+                let value = self.de.read_value()?.clone();
+                visitor.visit_enum(value.as_str().unwrap().into_deserializer())
+            }
+            ByteCodecType::Map(typed) => {
+                self.de.read_byte()?;
+                if typed {
+                    self.de.read_type()?;
+                }
+                visitor.visit_enum(EnumAccess::new(self))
+            },
+            v => {
+                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                    format!(
+                        "deserialize enum can't support tag {}",
+                        v.to_string()
+                    )
+                    .into(),
+                )))
+            }
+        }
     }
 
     fn deserialize_identifier<V>(self, visitor: V) -> Result<V::Value, Self::Error>
@@ -585,34 +758,33 @@ where
     where
         V: de::Visitor<'de>,
     {
-        todo!()
+        self.deserialize_any(visitor)
     }
 }
 
-// fn from_trait<'de, R, T>(read: R) -> Result<T, Error>
-// where
-//     R: AsRef<[u8]>,
-//     T: de::Deserialize<'de>,
-// {
-//     let mut de = Deserializer::from_bytes(read);
-//     let value = de::Deserialize::deserialize(&mut de)?;
+pub fn from_bytes<'de, R, T>(read: R) -> Result<T, Error>
+where
+    R: AsRef<[u8]>,
+    T: de::Deserialize<'de>,
+{
+    let mut de = Deserializer::from_bytes(read)?;
+    let value = T::deserialize(&mut de)?;
 
-//     // Make sure the whole stream has been consumed.
-//     de.end()?;
-//     Ok(value)
-// }
+    Ok(value)
+}
 
 #[cfg(test)]
 mod tests {
     use crate::de::Deserializer;
     use serde::Deserialize;
+    use std::collections::HashMap;
+    use crate::de::from_bytes;
 
     fn test_decode_ok<'a, T>(rdr: &[u8], target: T)
     where
         T: Deserialize<'a> + std::cmp::PartialEq + std::fmt::Debug,
     {
-        let mut de = Deserializer::from_bytes(rdr).unwrap();
-        let t = T::deserialize(&mut de).unwrap();
+        let t: T = from_bytes(rdr).unwrap();
         assert_eq!(t, target);
     }
     #[test]
@@ -657,6 +829,93 @@ mod tests {
             test_decode_ok(&[0x57, 0x90, 0x91, b'Z'], vec![0, 1]);
         }
     }
+
+    #[test]
+    fn test_basic_object_type() {
+        {
+            test_decode_ok(
+                &[b'V', 0x04, b'[', b'i', b'n', b't', 0x92, 0x90, 0x91],
+                vec![0, 1],
+            );
+            //Untyped variable list
+            test_decode_ok(&[0x57, 0x90, 0x91, b'Z'], vec![0, 1]);
+        }
+
+        {
+            let mut map = HashMap::new();
+            map.insert(1, "fee".to_string());
+            map.insert(16, "fie".to_string());
+            map.insert(256, "foe".to_string());
+            test_decode_ok(
+                &[
+                    b'M', 0x13, b'c', b'o', b'm', b'.', b'c', b'a', b'u', b'c', b'h', b'o', b'.',
+                    b't', b'e', b's', b't', b'.', b'c', b'a', b'r', 0x91, 0x03, b'f', b'e', b'e',
+                    0xa0, 0x03, b'f', b'i', b'e', 0xc9, 0x00, 0x03, b'f', b'o', b'e', b'Z',
+                ],
+                map.clone(),
+            );
+
+            test_decode_ok(
+                &[
+                    b'H', 0x91, 0x03, b'f', b'e', b'e', 0xa0, 0x03, b'f', b'i', b'e', 0xc9, 0x00,
+                    0x03, b'f', b'o', b'e', b'Z',
+                ],
+                map.clone(),
+            );
+        }
+    }
+
+    #[test]
+    fn test_basic_struct() {
+        #[derive(Debug, PartialEq, Deserialize, Clone)]
+        #[serde(rename = "example.Car", rename_all = "PascalCase")]
+        struct Car {
+            color: String,
+            model: String,
+        }
+
+        let car = Car {
+            color: "red".to_string(),
+            model: "corvette".to_string(),
+        };
+
+        // deserialize struct from map
+        test_decode_ok(
+            &[
+                b'H', 0x05, b'C', b'o', b'l', b'o', b'r', 0x03, b'r', b'e', b'd',
+                0x05, b'M', b'o', b'd', b'e', b'l', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
+                b'Z'
+            ],
+            car.clone(),
+        );
+
+        // deserialize struct from object data
+        test_decode_ok(
+            &[
+                b'C', 0x0b, b'e', b'x', b'a', b'm', b'p', b'l', b'e', b'.', b'C', b'a', b'r', 0x92,
+                0x05, b'C', b'o', b'l', b'o', b'r', 0x05, b'M', b'o', b'd', b'e', b'l', b'O', 0x90,
+                0x03, b'r', b'e', b'd', 0x08, b'c', b'o', b'r', b'v', b'e', b't', b't', b'e',
+            ],
+            car,
+        );
+    }
+
+    #[test]
+    fn test_enum() {
+        #[derive(Deserialize, PartialEq, Debug)]
+        enum E {
+            Unit,
+            Newtype(u32),
+            Tuple(u32, u32),
+            Struct { a: u32 },
+        }
+
+        test_decode_ok(&[0x04, b'U', b'n', b'i', b't'], E::Unit);
+        test_decode_ok(&[b'H', 0x07, b'N', b'e', b'w', b't', b'y', b'p', b'e', 0x91, b'Z'], E::Newtype(1));
+        test_decode_ok(&[b'H', 0x05, b'T', b'u', b'p', b'l', b'e', 0x57, 0x91, 0x91, b'Z'], E::Tuple(1, 1));
+        test_decode_ok(&[b'H', 0x06, b'S', b't', b'r', b'u', b'c', b't', b'H', 0x01, b'a', 0x91, b'Z', b'Z'], E::Struct{a: 1});
+    }
+
     #[test]
     fn test_newtype_struct() {
         #[derive(Deserialize, Debug)]
@@ -668,5 +927,6 @@ mod tests {
             let t = Test::deserialize(&mut de).unwrap();
             assert_eq!(t.0, 1);
         }
+
     }
 }

@@ -13,6 +13,8 @@ pub enum Error {
     SyntaxError(ErrorKind),
     IoError(io::Error),
     FromUtf8Error(FromUtf8Error),
+    SerdeDesrializeError(String),
+    SerdeSerializeError(String),
     UnSupportedRefType,
 }
 
@@ -21,6 +23,8 @@ impl fmt::Display for Error {
         match self {
             Error::SyntaxError(err) => write!(f, "syntax error: {}", err),
             Error::IoError(err) => err.fmt(f),
+            Error::SerdeDesrializeError(err) => write!(f, "serde deserialize error: {}", err),
+            Error::SerdeSerializeError(err) => write!(f, "serde serialize error: {}", err),
             Error::FromUtf8Error(err) => err.fmt(f),
             Error::UnSupportedRefType => write!(f, "unsupported ref type"),
         }
@@ -51,13 +55,13 @@ impl From<FromUtf8Error> for Error {
 
 impl SerError for Error {
     fn custom<T: fmt::Display>(msg: T) -> Self {
-        Error::SyntaxError(ErrorKind::UnexpectedType(msg.to_string()))
+        Error::SerdeSerializeError(msg.to_string())
     }
 }
 
 impl DeError for Error {
     fn custom<T: fmt::Display>(msg: T) -> Self {
-        Error::SyntaxError(ErrorKind::UnexpectedType(msg.to_string()))
+        Error::SerdeDesrializeError(msg.to_string())
     }
 }
 
@@ -65,6 +69,8 @@ impl StdError for Error {
     fn source(&self) -> Option<&(dyn StdError + 'static)> {
         match self {
             Error::SyntaxError(_) => None,
+            Error::SerdeDesrializeError(_) => None,
+            Error::SerdeSerializeError(_) => None,
             Error::IoError(err) => Some(err),
             Error::FromUtf8Error(err) => Some(err),
             Error::UnSupportedRefType => Some(self),
