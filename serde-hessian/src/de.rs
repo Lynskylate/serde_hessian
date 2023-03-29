@@ -118,15 +118,22 @@ impl<'de, 'a, R: AsRef<[u8]>> de::MapAccess<'de> for MapAccess<'a, R> {
     }
 }
 
+impl<'a, R: AsRef<[u8]>> fmt::Display for MapAccess<'a, R> {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(
+            f,
+            "MapAccess(class: {})",
+            self.name.clone().unwrap_or("None".into())
+        )
+    }
+}
+
 impl<'a, R: AsRef<[u8]>> fmt::Display for SeqAccess<'a, R> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         write!(
             f,
-            "{}",
-            format!(
-                "SeqAccess(class: {})",
-                self.name.clone().unwrap_or("None".into())
-            )
+            "SeqAccess(class: {})",
+            self.name.clone().unwrap_or("None".into())
         )
     }
 }
@@ -150,9 +157,18 @@ impl<'de, 'a, R: AsRef<[u8]>> de::SeqAccess<'de> for SeqAccess<'a, R> {
     where
         T: de::DeserializeSeed<'de>,
     {
-        if self.len.is_none() && self.de.de.peek_byte()? == b'Z' {
-            return Ok(None);
-        } else if self.size_hint().is_some() && self.size_hint().unwrap() == 0 {
+        let end = if self.len.is_some() {
+            self.len.unwrap() == self.inx
+        } else {
+            self.de.de.peek_byte()? == b'Z'
+        };
+
+        if end {
+            if self.len.is_none() {
+                // read 'Z'
+                self.de.de.read_byte()?;
+            }
+
             return Ok(None);
         }
         let value = seed.deserialize(&mut *self.de)?;
@@ -170,7 +186,7 @@ impl<'de, 'a, R: AsRef<[u8]>> de::SeqAccess<'de> for SeqAccess<'a, R> {
     }
 }
 
-impl<'de, R: AsRef<[u8]>> Deserializer<R> {
+impl<R: AsRef<[u8]>> Deserializer<R> {
     pub fn new(de: HessianDecoder<R>) -> Self {
         Deserializer { de }
     }
