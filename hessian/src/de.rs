@@ -64,7 +64,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
         Ok(ByteCodecType::from(tag))
     }
 
-    fn read_definition(&mut self) -> Result<()> {
+    pub fn read_definition(&mut self) -> Result<()> {
         // TODO(lynskylate@gmail.com): optimize error
         let name = match self.read_value() {
             Ok(Value::String(n)) => Ok(n),

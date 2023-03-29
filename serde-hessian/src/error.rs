@@ -5,14 +5,15 @@ use std::error::Error as StdError;
 use std::string::FromUtf8Error;
 use std::{fmt, io};
 
-use serde::ser::Error as SerError;
 use serde::de::Error as DeError;
+use serde::ser::Error as SerError;
 
 #[derive(Debug)]
 pub enum Error {
     SyntaxError(ErrorKind),
     IoError(io::Error),
     FromUtf8Error(FromUtf8Error),
+    UnSupportedRefType,
 }
 
 impl fmt::Display for Error {
@@ -21,6 +22,7 @@ impl fmt::Display for Error {
             Error::SyntaxError(err) => write!(f, "syntax error: {}", err),
             Error::IoError(err) => err.fmt(f),
             Error::FromUtf8Error(err) => err.fmt(f),
+            Error::UnSupportedRefType => write!(f, "unsupported ref type"),
         }
     }
 }
@@ -65,6 +67,7 @@ impl StdError for Error {
             Error::SyntaxError(_) => None,
             Error::IoError(err) => Some(err),
             Error::FromUtf8Error(err) => Some(err),
+            Error::UnSupportedRefType => Some(self),
         }
     }
 }

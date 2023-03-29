@@ -58,7 +58,9 @@ impl<'a, W: io::Write> ser::SerializeStruct for StructSerializer<'a, W> {
     ) -> Result<()> {
         if let Some(definition) = self.ser.0.get_definition(self.name) {
             if key != definition.fields[self.inx] {
-                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType("field name mismatch".to_string())));
+                return Err(Error::SyntaxError(hessian_rs::ErrorKind::UnexpectedType(
+                    "field name mismatch".to_string(),
+                )));
             }
             self.inx += 1;
         } else {
