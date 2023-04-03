@@ -6,8 +6,8 @@ use indexmap::{IndexMap, IndexSet};
 use super::error::Result;
 use super::value::{self, Definition, Value};
 
-pub struct Serializer<'a, W> {
-    writer: &'a mut W,
+pub struct Serializer<W> {
+    writer: W,
     type_cache: IndexSet<String>,
     classes_cache: IndexMap<String, Definition>,
 }
@@ -57,13 +57,18 @@ where
     }
 }
 
-impl<'a, W: io::Write> Serializer<'a, W> {
-    pub fn new(writer: &'a mut W) -> Self {
+impl<W: io::Write> Serializer<W> {
+    pub fn new(writer: W) -> Self {
         Serializer {
             writer,
             type_cache: IndexSet::new(),
             classes_cache: IndexMap::new(),
         }
+    }
+
+    pub fn extend_from_slice(&mut self, slice: &[u8]) -> Result<()> {
+        self.writer.write_all(slice)?;
+        Ok(())
     }
 
     pub fn serialize_value(&mut self, value: &Value) -> Result<()> {
@@ -82,21 +87,29 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         }
     }
 
+    #[inline]
     pub fn get_definition(&self, name: &str) -> Option<&Definition> {
         self.classes_cache.get(name)
     }
 
+    #[inline]
     pub fn serialize_fields_with_definition(
         &mut self,
         def: &Definition,
-        fields: &Vec<Value>,
+        fields: &[Value],
     ) -> Result<()> {
-        let ref_num = self.write_definition(def)?;
-        self.writer.write_u8(b'O')?;
-        self.serialize_int(ref_num as i32)?;
+        self.write_object_start(def)?;
         for value in fields.iter() {
             self.serialize_value(value)?;
         }
+        Ok(())
+    }
+
+    #[inline]
+    pub fn write_object_start(&mut self, def: &Definition) -> Result<()> {
+        let ref_num = self.write_definition(def)?;
+        self.writer.write_u8(b'O')?;
+        self.serialize_int(ref_num as i32)?;
         Ok(())
     }
 
@@ -128,7 +141,7 @@ impl<'a, W: io::Write> Serializer<'a, W> {
         Ok(())
     }
 
-    fn write_list_begin(&mut self, length: usize, tp: Option<&str>) -> Result<()> {
+    pub fn write_list_begin(&mut self, length: usize, tp: Option<&str>) -> Result<()> {
         if length <= 7 {
             if let Some(tp) = tp {
                 self.writer.write_u8((0x70 + length) as u8)?;
@@ -146,6 +159,25 @@ impl<'a, W: io::Write> Serializer<'a, W> {
             self.serialize_int(length as i32)?;
         }
 
+        Ok(())
+    }
+
+    pub fn write_map_start(&mut self, tp: Option<&str>) -> Result<()> {
+        match tp {
+            Some(tp) => {
+                self.writer.write_u8(b'M')?;
+                self.write_type(tp)?;
+            }
+            None => {
+                self.writer.write_u8(b'H')?;
+            }
+        };
+        Ok(())
+    }
+
+    #[inline]
+    pub fn write_object_end(&mut self) -> Result<()> {
+        self.writer.write_u8(b'Z')?;
         Ok(())
     }
 

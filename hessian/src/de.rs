@@ -30,7 +30,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     #[inline]
-    fn read_byte(&mut self) -> Result<u8> {
+    pub fn read_byte(&mut self) -> Result<u8> {
         Ok(self.buffer.read_u8()?)
     }
 
@@ -52,13 +52,19 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     }
 
     #[inline]
-    fn peek_byte(&mut self) -> Result<u8> {
+    pub fn peek_byte(&mut self) -> Result<u8> {
         let tag = self.buffer.read_u8()?;
         self.buffer.seek(SeekFrom::Current(-1))?;
         Ok(tag)
     }
 
-    fn read_definition(&mut self) -> Result<()> {
+    #[inline]
+    pub fn peek_byte_code_type(&mut self) -> Result<ByteCodecType> {
+        let tag = self.peek_byte()?;
+        Ok(ByteCodecType::from(tag))
+    }
+
+    pub fn read_definition(&mut self) -> Result<()> {
         // TODO(lynskylate@gmail.com): optimize error
         let name = match self.read_value() {
             Ok(Value::String(n)) => Ok(n),
@@ -85,6 +91,23 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
 
         self.class_references.push(Definition { name, fields });
         Ok(())
+    }
+
+    #[inline]
+    pub fn read_definition_id(&mut self, tag: Object) -> Result<&Definition> {
+        let ref_id = match tag {
+            Object::Compact(b) => b as usize - 0x60,
+            Object::Normal => {
+                let val = self.read_value()?;
+                match val {
+                    Value::Int(i) => i as usize,
+                    _ => return self.error(ErrorKind::UnexpectedType(val.to_string())),
+                }
+            }
+        };
+        self.class_references
+            .get(ref_id)
+            .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(ref_id)))
     }
 
     /// Read an object from buffer
@@ -117,23 +140,9 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     /// The integer value refers to the object definition.
     ///
     fn read_object(&mut self, tag: Object) -> Result<Value> {
-        let ref_id = match tag {
-            Object::Compact(b) => b as usize - 0x60,
-            Object::Normal => {
-                let val = self.read_value()?;
-                match val {
-                    Value::Int(i) => i as usize,
-                    _ => return self.error(ErrorKind::UnexpectedType(val.to_string())),
-                }
-            }
-        };
-        let definition = self
-            .class_references
-            .get(ref_id)
-            .ok_or(SyntaxError(ErrorKind::OutOfDefinitionRange(ref_id)))?
-            .clone();
+        let definition = self.read_definition_id(tag)?;
 
-        let Definition { name, fields } = definition;
+        let Definition { name, fields } = definition.clone();
         let mut map = HashMap::new();
         for k in fields {
             let v = self.read_value()?;
@@ -490,7 +499,7 @@ impl<R: AsRef<[u8]>> Deserializer<R> {
     ///
     /// See http://hessian.caucho.com/doc/hessian-serialization.html##ref
     ///
-    fn read_type(&mut self) -> Result<String> {
+    pub fn read_type(&mut self) -> Result<String> {
         match self.read_value() {
             Ok(Value::String(s)) => {
                 self.type_references.push(s.clone());
