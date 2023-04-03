@@ -5,7 +5,7 @@ use hessian_rs::{
 };
 
 use serde::{
-    ser::{self, SerializeStruct},
+    ser::{self},
     Serialize,
 };
 use std::io;

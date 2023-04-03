@@ -9,7 +9,7 @@ use serde_hessian::{de::from_slice, ser::to_vec};
 
 fn roundtrip_test<T: ser::Serialize + for<'a> de::Deserialize<'a> + PartialEq + Debug>(val: T) {
     let buf = to_vec(&val).unwrap();
-    let decoded: T = from_slice(&buf).unwrap();
+    let decoded: T = from_slice(buf).unwrap();
     assert_eq!(decoded, val);
 }
 
@@ -33,12 +33,12 @@ fn test_i64_roundtrip() {
     roundtrip_test(-16);
     roundtrip_test(47);
     roundtrip_test(48);
-    roundtrip_test(-2048 as i64);
-    roundtrip_test(-256 as i64);
-    roundtrip_test(2047 as i64);
-    roundtrip_test(-262144 as i64);
-    roundtrip_test(262143 as i64);
-    roundtrip_test(262144 as i64);
+    roundtrip_test(-2048_i64);
+    roundtrip_test(-256_i64);
+    roundtrip_test(2047_i64);
+    roundtrip_test(-262144_i64);
+    roundtrip_test(262143_i64);
+    roundtrip_test(262144_i64);
     roundtrip_test(i64::MAX);
     roundtrip_test(i64::MIN);
 }
