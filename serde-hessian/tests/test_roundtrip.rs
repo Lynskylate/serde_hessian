@@ -104,7 +104,7 @@ fn test_basic_struct() {
         a: 1,
         b: "abc".to_string(),
     });
-    roundtrip_test(Some(BasicStruct{
+    roundtrip_test(Some(BasicStruct {
         a: 1,
         b: "abc".to_string(),
     }));
@@ -124,5 +124,5 @@ fn test_enum() {
     roundtrip_test(E::Unit);
     roundtrip_test(E::Newtype(1));
     roundtrip_test(E::Tuple(1, 2));
-    roundtrip_test(E::Struct{a: 1});
+    roundtrip_test(E::Struct { a: 1 });
 }

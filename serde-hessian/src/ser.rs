@@ -1,7 +1,13 @@
 use crate::error::Error;
-use hessian_rs::{ser::Serializer as ValueSerializer, value::{Definition, Map}};
+use hessian_rs::{
+    ser::Serializer as ValueSerializer,
+    value::Definition,
+};
 
-use serde::{ser::{self, SerializeStruct}, Serialize};
+use serde::{
+    ser::{self, SerializeStruct},
+    Serialize,
+};
 use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -576,21 +582,29 @@ mod test {
         assert_eq!(to_vec(&u).unwrap(), expected);
 
         let n = E::Newtype(1);
-        assert_eq!(to_vec(&n).unwrap(), &[b'M', 0x01, b'E', 0x07, b'N', b'e', b'w', b't', b'y', b'p', b'e', 0x91, b'Z']);
+        assert_eq!(
+            to_vec(&n).unwrap(),
+            &[b'M', 0x01, b'E', 0x07, b'N', b'e', b'w', b't', b'y', b'p', b'e', 0x91, b'Z']
+        );
 
         // serialize tuple variant, use variant as list name
         let t = E::Tuple(1, 2);
         assert_eq!(
             to_vec(&t).unwrap(),
-            &[b'M', 0x01, b'E', 0x05, b'T', b'u', b'p', b'l', b'e', 0x72, 0x07, b'E', b'.', b'T', b'u', b'p', b'l', b'e', 0x91, 0x92, b'Z']
+            &[
+                b'M', 0x01, b'E', 0x05, b'T', b'u', b'p', b'l', b'e', 0x72, 0x07, b'E', b'.', b'T',
+                b'u', b'p', b'l', b'e', 0x91, 0x92, b'Z'
+            ]
         );
 
         // serialize Variant Struct, use variant naeme as map name
         let s = E::Struct { a: 1 };
         assert_eq!(
             to_vec(&s).unwrap(),
-            &[b'M', 0x01, b'E', 0x06, b'S', b't', b'r', b'u', b'c', b't',
-              b'M',  0x06, b'S', b't', b'r', b'u', b'c', b't', 0x01, b'a', 0x91, b'Z', b'Z']
+            &[
+                b'M', 0x01, b'E', 0x06, b'S', b't', b'r', b'u', b'c', b't', b'M', 0x06, b'S', b't',
+                b'r', b'u', b'c', b't', 0x01, b'a', 0x91, b'Z', b'Z'
+            ]
         );
     }
 }
