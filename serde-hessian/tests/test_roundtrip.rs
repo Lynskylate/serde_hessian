@@ -104,6 +104,11 @@ fn test_basic_struct() {
         a: 1,
         b: "abc".to_string(),
     });
+    roundtrip_test(Some(BasicStruct{
+        a: 1,
+        b: "abc".to_string(),
+    }));
+    roundtrip_test(None::<BasicStruct>);
 }
 
 // todo: fix enum round trip
@@ -117,6 +122,7 @@ fn test_enum() {
         Struct { a: u32 },
     }
     roundtrip_test(E::Unit);
-    // roundtrip_test(E::Newtype(1));
-    // roundtrip_test(E::Tuple(1, 2));
+    roundtrip_test(E::Newtype(1));
+    roundtrip_test(E::Tuple(1, 2));
+    roundtrip_test(E::Struct{a: 1});
 }
