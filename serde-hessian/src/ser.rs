@@ -1,8 +1,5 @@
 use crate::error::Error;
-use hessian_rs::{
-    ser::Serializer as ValueSerializer,
-    value::Definition,
-};
+use hessian_rs::{ser::Serializer as ValueSerializer, value::Definition};
 
 use serde::{
     ser::{self},
