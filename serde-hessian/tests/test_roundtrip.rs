@@ -9,7 +9,7 @@ use serde_hessian::{de::from_slice, ser::to_vec};
 
 fn roundtrip_test<T: ser::Serialize + for<'a> de::Deserialize<'a> + PartialEq + Debug>(val: T) {
     let buf = to_vec(&val).unwrap();
-    let decoded: T = from_slice(&buf).unwrap();
+    let decoded: T = from_slice(buf).unwrap();
     assert_eq!(decoded, val);
 }
 
@@ -33,12 +33,12 @@ fn test_i64_roundtrip() {
     roundtrip_test(-16);
     roundtrip_test(47);
     roundtrip_test(48);
-    roundtrip_test(-2048 as i64);
-    roundtrip_test(-256 as i64);
-    roundtrip_test(2047 as i64);
-    roundtrip_test(-262144 as i64);
-    roundtrip_test(262143 as i64);
-    roundtrip_test(262144 as i64);
+    roundtrip_test(-2048_i64);
+    roundtrip_test(-256_i64);
+    roundtrip_test(2047_i64);
+    roundtrip_test(-262144_i64);
+    roundtrip_test(262143_i64);
+    roundtrip_test(262144_i64);
     roundtrip_test(i64::MAX);
     roundtrip_test(i64::MIN);
 }
@@ -104,6 +104,11 @@ fn test_basic_struct() {
         a: 1,
         b: "abc".to_string(),
     });
+    roundtrip_test(Some(BasicStruct {
+        a: 1,
+        b: "abc".to_string(),
+    }));
+    roundtrip_test(None::<BasicStruct>);
 }
 
 // todo: fix enum round trip
@@ -117,6 +122,7 @@ fn test_enum() {
         Struct { a: u32 },
     }
     roundtrip_test(E::Unit);
-    // roundtrip_test(E::Newtype(1));
-    // roundtrip_test(E::Tuple(1, 2));
+    roundtrip_test(E::Newtype(1));
+    roundtrip_test(E::Tuple(1, 2));
+    roundtrip_test(E::Struct { a: 1 });
 }

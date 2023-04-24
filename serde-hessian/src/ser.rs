@@ -1,7 +1,10 @@
 use crate::error::Error;
 use hessian_rs::{ser::Serializer as ValueSerializer, value::Definition};
 
-use serde::{ser, Serialize};
+use serde::{
+    ser::{self},
+    Serialize,
+};
 use std::io;
 
 type Result<T> = std::result::Result<T, Error>;
@@ -135,7 +138,7 @@ impl<'a, W: io::Write> ser::SerializeTupleStruct for ListSerializer<'a, W> {
 
     #[inline]
     fn end(self) -> Result<()> {
-        Ok(())
+        ser::SerializeTuple::end(self)
     }
 }
 
@@ -150,6 +153,8 @@ impl<'a, W: io::Write> ser::SerializeTupleVariant for ListSerializer<'a, W> {
 
     #[inline]
     fn end(self) -> Result<()> {
+        self.ser.0.write_object_end()?;
+        ser::SerializeTuple::end(self)?;
         Ok(())
     }
 }
@@ -226,6 +231,8 @@ impl<'a, W: io::Write> ser::SerializeStructVariant for MapSerializer<'a, W> {
     #[inline]
     fn end(self) -> Result<()> {
         self.encoder.0.write_object_end()?;
+        // end of variant
+        self.encoder.0.write_object_end()?;
         Ok(())
     }
 }
@@ -240,7 +247,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     type SerializeTupleVariant = Self::SerializeTuple;
     type SerializeMap = MapSerializer<'a, W>;
     type SerializeStruct = StructSerializer<'a, W>;
-    type SerializeStructVariant = Self::SerializeMap;
+    type SerializeStructVariant = MapSerializer<'a, W>;
 
     #[inline]
     fn serialize_bool(self, value: bool) -> Result<()> {
@@ -365,12 +372,16 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     #[inline]
     fn serialize_newtype_variant<T: Serialize + ?Sized>(
         self,
-        _name: &'static str,
+        name: &'static str,
         _variant_index: u32,
-        _variant: &'static str,
+        variant: &'static str,
         value: &T,
     ) -> Result<()> {
-        value.serialize(self)
+        self.0.write_map_start(Some(name))?;
+        variant.serialize(&mut *self)?;
+        value.serialize(&mut *self)?;
+        self.0.write_object_end()?;
+        Ok(())
     }
 
     #[inline]
@@ -430,6 +441,8 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         variant: &'static str,
         len: usize,
     ) -> Result<Self::SerializeTupleVariant> {
+        self.0.write_map_start(Some(name))?;
+        self.0.serialize_string(variant)?;
         self.0
             .write_list_begin(len, Some(&format!("{}.{}", name, variant)))?;
         Ok(ListSerializer {
@@ -460,9 +473,11 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         variant: &'static str,
         _len: usize,
     ) -> Result<Self::SerializeStructVariant> {
+        self.0.write_map_start(Some(name))?;
+        self.serialize_str(variant)?;
         self.0.write_map_start(Some(variant))?;
         Ok(MapSerializer {
-            name: Some(name),
+            name: Some(variant),
             encoder: self,
         })
     }
@@ -564,20 +579,29 @@ mod test {
         assert_eq!(to_vec(&u).unwrap(), expected);
 
         let n = E::Newtype(1);
-        assert_eq!(to_vec(&n).unwrap(), &[0x91]);
+        assert_eq!(
+            to_vec(&n).unwrap(),
+            &[b'M', 0x01, b'E', 0x07, b'N', b'e', b'w', b't', b'y', b'p', b'e', 0x91, b'Z']
+        );
 
         // serialize tuple variant, use variant as list name
         let t = E::Tuple(1, 2);
         assert_eq!(
             to_vec(&t).unwrap(),
-            &[0x72, 0x07, b'E', b'.', b'T', b'u', b'p', b'l', b'e', 0x91, 0x92]
+            &[
+                b'M', 0x01, b'E', 0x05, b'T', b'u', b'p', b'l', b'e', 0x72, 0x07, b'E', b'.', b'T',
+                b'u', b'p', b'l', b'e', 0x91, 0x92, b'Z'
+            ]
         );
 
         // serialize Variant Struct, use variant naeme as map name
         let s = E::Struct { a: 1 };
         assert_eq!(
             to_vec(&s).unwrap(),
-            &[b'M', 0x06, b'S', b't', b'r', b'u', b'c', b't', 0x01, b'a', 0x91, b'Z']
+            &[
+                b'M', 0x01, b'E', 0x06, b'S', b't', b'r', b'u', b'c', b't', b'M', 0x06, b'S', b't',
+                b'r', b'u', b'c', b't', 0x01, b'a', 0x91, b'Z', b'Z'
+            ]
         );
     }
 }
