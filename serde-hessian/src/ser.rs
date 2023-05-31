@@ -26,7 +26,7 @@ pub struct StructSerializer<'a, W: io::Write> {
 }
 
 pub struct MapSerializer<'a, W: io::Write> {
-    name: Option<&'static str>,
+    _name: Option<&'static str>,
     encoder: &'a mut Serializer<W>,
 }
 
@@ -455,7 +455,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
     fn serialize_map(self, _len: Option<usize>) -> Result<Self::SerializeMap> {
         self.0.write_map_start(None)?;
         Ok(MapSerializer {
-            name: None,
+            _name: None,
             encoder: self,
         })
     }
@@ -477,7 +477,7 @@ impl<'a, W: io::Write> ser::Serializer for &'a mut Serializer<W> {
         self.serialize_str(variant)?;
         self.0.write_map_start(Some(variant))?;
         Ok(MapSerializer {
-            name: Some(variant),
+            _name: Some(variant),
             encoder: self,
         })
     }
