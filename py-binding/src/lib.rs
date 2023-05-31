@@ -1,19 +1,15 @@
-use std::io;
-
 use hessian_rs::ser::Serializer;
-use hessian_rs::Error;
 use pyo3::exceptions::PyTypeError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::PyErr;
 
-use pyo3::types::PyDateTime;
-use pyo3::types::PyList;
-use pyo3::types::PyTuple;
 use pyo3::types::timezone_utc;
 use pyo3::types::PyBytes;
+use pyo3::types::PyDateTime;
 use pyo3::types::PyDict;
-
+use pyo3::types::PyList;
+use pyo3::types::PyTuple;
 
 #[pymodule]
 fn hessian_py(_py: Python, m: &PyModule) -> PyResult<()> {
@@ -40,14 +36,7 @@ pub fn load(py: Python, fp: PyObject, kwargs: Option<&PyDict>) -> PyResult<PyObj
     let _success = io.call_method("seek", (0,), None);
 
     let s_obj = io.call_method0("read")?;
-    loads(
-        py,
-        s_obj.to_object(py),
-        None,
-        None,
-        None,
-        kwargs,
-    )
+    loads(py, s_obj.to_object(py), None, None, None, kwargs)
 }
 
 #[pyfunction]
@@ -59,14 +48,7 @@ pub fn loads(
     object_hook: Option<PyObject>,
     kwargs: Option<&PyDict>,
 ) -> PyResult<PyObject> {
-    loads_impl(
-        py,
-        s,
-        encoding,
-        cls,
-        object_hook,
-        kwargs,
-    )
+    loads_impl(py, s, encoding, cls, object_hook, kwargs)
 }
 
 pub fn loads_impl(
@@ -94,11 +76,9 @@ pub fn loads_impl(
     Ok(HessianValueWrapper(value).to_object(py))
 }
 
-
 struct HessianValueWrapper(hessian_rs::Value);
 
-
-impl ToPyObject for HessianValueWrapper{
+impl ToPyObject for HessianValueWrapper {
     fn to_object(&self, py: Python<'_>) -> PyObject {
         match &self.0 {
             hessian_rs::Value::Null => py.None(),
@@ -106,14 +86,27 @@ impl ToPyObject for HessianValueWrapper{
             hessian_rs::Value::Int(i) => i.to_object(py),
             hessian_rs::Value::Long(l) => l.to_object(py),
             hessian_rs::Value::Double(d) => d.to_object(py),
-            hessian_rs::Value::Date(d) => PyDateTime::from_timestamp(py, (*d as f64) / 1000.0, Some(timezone_utc(py))).unwrap().to_object(py),
+            hessian_rs::Value::Date(d) => {
+                PyDateTime::from_timestamp(py, (*d as f64) / 1000.0, Some(timezone_utc(py)))
+                    .unwrap()
+                    .to_object(py)
+            }
             hessian_rs::Value::String(s) => s.to_object(py),
             hessian_rs::Value::Bytes(b) => PyBytes::new(py, b).to_object(py),
-            hessian_rs::Value::List(l) => l.value().iter().map(|v| HessianValueWrapper(v.clone()).to_object(py)).collect::<Vec<_>>().to_object(py),
+            hessian_rs::Value::List(l) => l
+                .value()
+                .iter()
+                .map(|v| HessianValueWrapper(v.clone()).to_object(py))
+                .collect::<Vec<_>>()
+                .to_object(py),
             hessian_rs::Value::Map(m) => {
                 let dict = PyDict::new(py);
-                for(k, v) in m.value().iter() {
-                    dict.set_item(HessianValueWrapper(k.clone()).to_object(py), HessianValueWrapper(v.clone()).to_object(py)).unwrap();
+                for (k, v) in m.value().iter() {
+                    dict.set_item(
+                        HessianValueWrapper(k.clone()).to_object(py),
+                        HessianValueWrapper(v.clone()).to_object(py),
+                    )
+                    .unwrap();
                 }
                 dict.to_object(py)
             }
@@ -132,19 +125,11 @@ pub fn dump(
     default: Option<PyObject>,
     kwargs: Option<&PyDict>,
 ) -> PyResult<PyObject> {
-    let s = dumps(
-        py,
-        obj,
-        allow_nan,
-        cls,
-        default,
-        kwargs,
-    )?;
+    let s = dumps(py, obj, allow_nan, cls, default, kwargs)?;
     let fp_ref: &PyAny = fp.extract(py)?;
     fp_ref.call_method1("write", (s,))?;
     Ok(pyo3::Python::None(py))
 }
-
 
 #[pyfunction]
 pub fn dumps(
@@ -161,17 +146,20 @@ pub fn dumps(
     Ok(PyBytes::new(py, &buf).into())
 }
 
-
 fn convert_err(e: hessian_rs::Error) -> PyErr {
     PyErr::new::<PyValueError, _>(format!("Cannot serialize value: {:?}", e))
 }
 
-fn dump_value<'p, 'a>(py: &'p Python, obj: &'a PyAny, ser: &'a mut Serializer<&mut Vec<u8>>) -> PyResult<()>{
-    if let Ok(val) = obj.extract::<&'a PyDict>(){
+fn dump_value<'p, 'a>(
+    _py: &'p Python,
+    obj: &'a PyAny,
+    ser: &'a mut Serializer<&mut Vec<u8>>,
+) -> PyResult<()> {
+    if let Ok(val) = obj.extract::<&'a PyDict>() {
         ser.write_map_start(None).map_err(convert_err)?;
         for (k, v) in val.iter() {
-            dump_value(py, k, ser)?;
-            dump_value(py, v, ser)?;
+            dump_value(_py, k, ser)?;
+            dump_value(_py, v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
@@ -180,7 +168,7 @@ fn dump_value<'p, 'a>(py: &'p Python, obj: &'a PyAny, ser: &'a mut Serializer<&m
     if let Ok(val) = obj.extract::<&'a PyList>() {
         ser.write_list_begin(val.len(), None).map_err(convert_err)?;
         for v in val.iter() {
-            dump_value(py, v, ser)?;
+            dump_value(_py, v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
@@ -189,15 +177,16 @@ fn dump_value<'p, 'a>(py: &'p Python, obj: &'a PyAny, ser: &'a mut Serializer<&m
     if let Ok(val) = obj.extract::<&'a PyTuple>() {
         ser.write_list_begin(val.len(), None).map_err(convert_err)?;
         for v in val.iter() {
-            dump_value(py, v, ser)?;
+            dump_value(_py, v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
     }
 
-    if let Ok(val) = obj.extract::<&'a PyDateTime>(){
+    if let Ok(val) = obj.extract::<&'a PyDateTime>() {
         let timestamp = val.call_method0("timestamp")?.extract::<f64>()?;
-        ser.serialize_date((timestamp * 1000.0) as i64).map_err(convert_err)?;
+        ser.serialize_date((timestamp * 1000.0) as i64)
+            .map_err(convert_err)?;
         return Ok(());
     }
 
@@ -220,7 +209,10 @@ fn dump_value<'p, 'a>(py: &'p Python, obj: &'a PyAny, ser: &'a mut Serializer<&m
         return ser.serialize_null().map_err(convert_err);
     }
     match obj.repr() {
-        Ok(repr) => Err(PyErr::new::<PyValueError, _>(format!("Value is not hessian serializable: {}", repr))),
+        Ok(repr) => Err(PyErr::new::<PyValueError, _>(format!(
+            "Value is not hessian serializable: {}",
+            repr
+        ))),
         Err(_) => Err(PyErr::new::<PyValueError, _>(format!(
             "Type is not JSON serializable: {}",
             obj.get_type().name()?
