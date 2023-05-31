@@ -2,4 +2,5 @@
 members = [
     "hessian",
     "serde-hessian",
+    "py-binding",
 ]

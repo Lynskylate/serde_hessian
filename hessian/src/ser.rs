@@ -310,7 +310,7 @@ impl<W: io::Write> Serializer<W> {
 
     pub fn serialize_binary(&mut self, v: &[u8]) -> Result<()> {
         if v.len() < 16 {
-            self.writer.write_all(&[(v.len() - 0x20) as u8])?;
+            self.writer.write_all(&[(v.len() + 0x20) as u8])?;
             self.writer.write_all(v)?;
         } else {
             for (last, chunk) in v.chunks(0xffff).identify_last() {
