@@ -59,15 +59,15 @@ pub fn loads_impl(
     _object_hook: Option<PyObject>,
     _kwargs: Option<&PyDict>,
 ) -> PyResult<PyObject> {
-    let bytes: Vec<u8> = s.extract(py).map_err(|e| PyTypeError::new_err(format!(
+    let bytes: Vec<u8> = s.extract(py).map_err(|e| {
+        PyTypeError::new_err(format!(
             "the hessian object must be bytes or bytearray, got: {:?}",
             e
-        )))?;
+        ))
+    })?;
 
-    let value = hessian_rs::from_slice(&bytes).map_err(|e| PyTypeError::new_err(format!(
-            "Parse hessian error: {:?}",
-            e
-        )))?;
+    let value = hessian_rs::from_slice(&bytes)
+        .map_err(|e| PyTypeError::new_err(format!("Parse hessian error: {:?}", e)))?;
 
     Ok(HessianValueWrapper(value).to_object(py))
 }
