@@ -8,6 +8,7 @@ class HessianRoundTripTest(unittest.TestCase):
     def test_load_bytes(self):
         self.roundtrip(b"")
         self.roundtrip(b"\x01\x02\x03")
+        self.roundtrip(b"\x01" * 256)
 
     def test_boolean(self):
         self.roundtrip(True)
