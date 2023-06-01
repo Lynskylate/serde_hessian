@@ -1,20 +1,20 @@
-use std::io::Write;
 use hessian_rs::ser::Serializer;
 use hessian_rs::value::Definition;
 use pyo3::exceptions::PyTypeError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::PyErr;
+use std::io::Write;
 
-use pyo3::types::PyBool;
-use pyo3::types::PyFloat;
-use pyo3::types::PyInt;
-use pyo3::types::PyString;
 use pyo3::types::timezone_utc;
+use pyo3::types::PyBool;
 use pyo3::types::PyBytes;
 use pyo3::types::PyDateTime;
 use pyo3::types::PyDict;
+use pyo3::types::PyFloat;
+use pyo3::types::PyInt;
 use pyo3::types::PyList;
+use pyo3::types::PyString;
 use pyo3::types::PyTuple;
 
 #[pymodule]
@@ -152,12 +152,12 @@ fn convert_err(e: hessian_rs::Error) -> PyErr {
     PyErr::new::<PyValueError, _>(format!("Cannot serialize value: {:?}", e))
 }
 
-fn dump_value<'a, W>(
-    obj: &'a PyAny,
-    ser: &'a mut Serializer<W>,
-) -> PyResult<()> where W: Write{
+fn dump_value<'a, W>(obj: &'a PyAny, ser: &'a mut Serializer<W>) -> PyResult<()>
+where
+    W: Write,
+{
     if let Ok(val) = obj.extract::<PySerializeObject>() {
-        let def = Definition{
+        let def = Definition {
             name: val.class_name,
             fields: val.fields,
         };
@@ -172,8 +172,8 @@ fn dump_value<'a, W>(
     if let Ok(val) = obj.extract::<&'a PyDict>() {
         ser.write_map_start(None).map_err(convert_err)?;
         for (k, v) in val.iter() {
-            dump_value( k, ser)?;
-            dump_value( v, ser)?;
+            dump_value(k, ser)?;
+            dump_value(v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
@@ -237,7 +237,6 @@ fn dump_value<'a, W>(
     }
 }
 
-
 #[derive(FromPyObject)]
 struct PySerializeObject<'a> {
     #[pyo3(attribute("hessian_class_name"))]
@@ -253,7 +252,6 @@ struct PyHessianSerializer {
     ser: hessian_rs::ser::Serializer<Vec<u8>>,
 }
 
-
 #[pymethods]
 impl PyHessianSerializer {
     #[new]
@@ -264,20 +262,21 @@ impl PyHessianSerializer {
     }
 
     fn serialize_bool(&mut self, b: &PyBool) -> PyResult<()> {
-        self.ser
-            .serialize_bool(b.is_true()).map_err(convert_err)?;
+        self.ser.serialize_bool(b.is_true()).map_err(convert_err)?;
         Ok(())
     }
 
     fn serialize_bytes(&mut self, bytes: &PyBytes) -> PyResult<()> {
         self.ser
-            .serialize_binary(bytes.as_bytes()).map_err(convert_err)?;
+            .serialize_binary(bytes.as_bytes())
+            .map_err(convert_err)?;
         Ok(())
     }
 
     fn serialize_string(&mut self, s: &PyString) -> PyResult<()> {
         self.ser
-            .serialize_string(s.to_str().unwrap()).map_err(convert_err)?;
+            .serialize_string(s.to_str().unwrap())
+            .map_err(convert_err)?;
         Ok(())
     }
 
@@ -287,13 +286,17 @@ impl PyHessianSerializer {
     }
 
     fn serialize_double(&mut self, d: &PyFloat) -> PyResult<()> {
-        self.ser.serialize_double(d.extract()?).map_err(convert_err)?;
+        self.ser
+            .serialize_double(d.extract()?)
+            .map_err(convert_err)?;
         Ok(())
     }
 
     fn serialize_date(&mut self, d: &PyDateTime) -> PyResult<()> {
         let timestamp = d.call_method0("timestamp")?.extract::<f64>()?;
-        self.ser.serialize_date((timestamp * 1000.0) as i64).map_err(convert_err)?;
+        self.ser
+            .serialize_date((timestamp * 1000.0) as i64)
+            .map_err(convert_err)?;
         Ok(())
     }
 
@@ -303,7 +306,9 @@ impl PyHessianSerializer {
     }
 
     fn serialize_map(&mut self, d: &PyDict, typ: Option<&PyString>) -> PyResult<()> {
-        self.ser.write_map_start(typ.map(|t| t.to_str().unwrap())).map_err(convert_err)?;
+        self.ser
+            .write_map_start(typ.map(|t| t.to_str().unwrap()))
+            .map_err(convert_err)?;
         for (k, v) in d.iter() {
             self.serialize_string(k.extract()?)?;
             self.serialize_value(v)?;
