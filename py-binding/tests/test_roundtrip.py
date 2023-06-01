@@ -1,9 +1,9 @@
 import unittest
-import hessian_py
+import hessian_codec
 
 class HessianRoundTripTest(unittest.TestCase):
     def roundtrip(self, val):
-        self.assertEqual(val, hessian_py.loads(hessian_py.dumps(val)))
+        self.assertEqual(val, hessian_codec.loads(hessian_codec.dumps(val)))
 
     def test_struct(self):
         class TestStruct:
@@ -18,10 +18,10 @@ class HessianRoundTripTest(unittest.TestCase):
             hessian_fields = ["test", "test2"]
             hessian_class_name = "test.TestStruct"
 
-        st = hessian_py.dumps(TestStruct())
+        st = hessian_codec.dumps(TestStruct())
         self.assertEqual(st, b"C\x0ftest.TestStruct\x92\x04test\x05test2O\x90\x91\x92")
         # todo: add reflection to loads
-        t = hessian_py.loads(st)
+        t = hessian_codec.loads(st)
         self.assertEqual(t["test"], 1)
         self.assertEqual(t["test2"], 2)
 

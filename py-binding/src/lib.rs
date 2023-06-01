@@ -18,7 +18,7 @@ use pyo3::types::PyString;
 use pyo3::types::PyTuple;
 
 #[pymodule]
-fn hessian_py(_py: Python, m: &PyModule) -> PyResult<()> {
+fn hessian_codec(_py: Python, m: &PyModule) -> PyResult<()> {
     m.add("__version__", env!("CARGO_PKG_VERSION"))?;
 
     m.add_wrapped(wrap_pyfunction!(load))?;
