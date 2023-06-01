@@ -75,7 +75,7 @@ fn test_decode_list() {
         )
     );
     assert_eq!(
-        load_value_from_file("tests/fixtures/list/untyped_<String>[foo,bar].bin").unwrap(),
+        load_value_from_file("tests/fixtures/list/untyped_string_foo_bar.bin").unwrap(),
         Value::List(vec!["foo".into(), "bar".into()].into())
     );
     assert_eq!(
