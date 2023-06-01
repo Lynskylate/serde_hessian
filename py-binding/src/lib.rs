@@ -1,9 +1,15 @@
+use std::io::Write;
 use hessian_rs::ser::Serializer;
+use hessian_rs::value::Definition;
 use pyo3::exceptions::PyTypeError;
 use pyo3::exceptions::PyValueError;
 use pyo3::prelude::*;
 use pyo3::PyErr;
 
+use pyo3::types::PyBool;
+use pyo3::types::PyFloat;
+use pyo3::types::PyInt;
+use pyo3::types::PyString;
 use pyo3::types::timezone_utc;
 use pyo3::types::PyBytes;
 use pyo3::types::PyDateTime;
@@ -138,7 +144,7 @@ pub fn dumps(
 ) -> PyResult<PyObject> {
     let mut buf = Vec::new();
     let mut ser = hessian_rs::ser::Serializer::new(&mut buf);
-    dump_value(&py, obj.extract(py)?, &mut ser)?;
+    dump_value(obj.extract(py)?, &mut ser)?;
     Ok(PyBytes::new(py, &buf).into())
 }
 
@@ -146,16 +152,28 @@ fn convert_err(e: hessian_rs::Error) -> PyErr {
     PyErr::new::<PyValueError, _>(format!("Cannot serialize value: {:?}", e))
 }
 
-fn dump_value<'p, 'a>(
-    _py: &'p Python,
+fn dump_value<'a, W>(
     obj: &'a PyAny,
-    ser: &'a mut Serializer<&mut Vec<u8>>,
-) -> PyResult<()> {
+    ser: &'a mut Serializer<W>,
+) -> PyResult<()> where W: Write{
+    if let Ok(val) = obj.extract::<PySerializeObject>() {
+        let def = Definition{
+            name: val.class_name,
+            fields: val.fields,
+        };
+        ser.write_definition(&def).map_err(convert_err)?;
+        ser.write_object_start(&def).map_err(convert_err)?;
+        for v in val.values {
+            dump_value(v, ser)?;
+        }
+        return Ok(());
+    }
+
     if let Ok(val) = obj.extract::<&'a PyDict>() {
         ser.write_map_start(None).map_err(convert_err)?;
         for (k, v) in val.iter() {
-            dump_value(_py, k, ser)?;
-            dump_value(_py, v, ser)?;
+            dump_value( k, ser)?;
+            dump_value( v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
@@ -164,7 +182,7 @@ fn dump_value<'p, 'a>(
     if let Ok(val) = obj.extract::<&'a PyList>() {
         ser.write_list_begin(val.len(), None).map_err(convert_err)?;
         for v in val.iter() {
-            dump_value(_py, v, ser)?;
+            dump_value(v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
@@ -173,7 +191,7 @@ fn dump_value<'p, 'a>(
     if let Ok(val) = obj.extract::<&'a PyTuple>() {
         ser.write_list_begin(val.len(), None).map_err(convert_err)?;
         for v in val.iter() {
-            dump_value(_py, v, ser)?;
+            dump_value(v, ser)?;
         }
         ser.write_object_end().map_err(convert_err)?;
         return Ok(());
@@ -196,10 +214,13 @@ fn dump_value<'p, 'a>(
         return ser.serialize_bool(val).map_err(convert_err);
     }
     if let Ok(val) = FromPyObject::extract(obj) {
-        return ser.serialize_double(val).map_err(convert_err);
+        return ser.serialize_int(val).map_err(convert_err);
     }
     if let Ok(val) = FromPyObject::extract(obj) {
         return ser.serialize_long(val).map_err(convert_err);
+    }
+    if let Ok(val) = FromPyObject::extract(obj) {
+        return ser.serialize_double(val).map_err(convert_err);
     }
     if obj.is_none() {
         return ser.serialize_null().map_err(convert_err);
@@ -213,5 +234,81 @@ fn dump_value<'p, 'a>(
             "Type is not JSON serializable: {}",
             obj.get_type().name()?
         ))),
+    }
+}
+
+
+#[derive(FromPyObject)]
+struct PySerializeObject<'a> {
+    #[pyo3(attribute("hessian_class_name"))]
+    class_name: String,
+    #[pyo3(attribute("hessian_fields"))]
+    fields: Vec<String>,
+    #[pyo3(attribute("hessian_values"))]
+    values: Vec<&'a PyAny>,
+}
+
+#[pyclass]
+struct PyHessianSerializer {
+    ser: hessian_rs::ser::Serializer<Vec<u8>>,
+}
+
+
+#[pymethods]
+impl PyHessianSerializer {
+    #[new]
+    fn new() -> Self {
+        Self {
+            ser: hessian_rs::ser::Serializer::new(Vec::new()),
+        }
+    }
+
+    fn serialize_bool(&mut self, b: &PyBool) -> PyResult<()> {
+        self.ser
+            .serialize_bool(b.is_true()).map_err(convert_err)?;
+        Ok(())
+    }
+
+    fn serialize_bytes(&mut self, bytes: &PyBytes) -> PyResult<()> {
+        self.ser
+            .serialize_binary(bytes.as_bytes()).map_err(convert_err)?;
+        Ok(())
+    }
+
+    fn serialize_string(&mut self, s: &PyString) -> PyResult<()> {
+        self.ser
+            .serialize_string(s.to_str().unwrap()).map_err(convert_err)?;
+        Ok(())
+    }
+
+    fn serialize_long(&mut self, l: &PyInt) -> PyResult<()> {
+        self.ser.serialize_long(l.extract()?).map_err(convert_err)?;
+        Ok(())
+    }
+
+    fn serialize_double(&mut self, d: &PyFloat) -> PyResult<()> {
+        self.ser.serialize_double(d.extract()?).map_err(convert_err)?;
+        Ok(())
+    }
+
+    fn serialize_date(&mut self, d: &PyDateTime) -> PyResult<()> {
+        let timestamp = d.call_method0("timestamp")?.extract::<f64>()?;
+        self.ser.serialize_date((timestamp * 1000.0) as i64).map_err(convert_err)?;
+        Ok(())
+    }
+
+    fn serialize_value(&mut self, d: &PyAny) -> PyResult<()> {
+        dump_value(d, &mut self.ser)?;
+        Ok(())
+    }
+
+    fn serialize_map(&mut self, d: &PyDict, typ: Option<&PyString>) -> PyResult<()> {
+        self.ser.write_map_start(typ.map(|t| t.to_str().unwrap())).map_err(convert_err)?;
+        for (k, v) in d.iter() {
+            self.serialize_string(k.extract()?)?;
+            self.serialize_value(v)?;
+        }
+        self.ser.write_object_end().map_err(convert_err)?;
+        Ok(())
     }
 }

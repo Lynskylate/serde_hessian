@@ -40,6 +40,9 @@ class HessianLoadsTest(unittest.TestCase):
     def test_dict(self):
         self.assertEqual(hessian_py.loads(b"H\x91\x03fee\xa0\x03fie\xc9\x00\x03foeZ"), {1: "fee", 16: "fie", 256: "foe"})
 
+    def test_struct(self):
+        self.assertEqual(hessian_py.loads(b"C\x0bexample.Car\x92\x05Color\x05ModelO\x90\x03red\x08corvette"), {"Color": "red", "Model": "corvette"})
+
 
 if __name__ == '__main__':
     unittest.main()
